@@ -1,4 +1,4 @@
-"""Application entry point. Run with: uvicorn app.main:app --reload"""
+﻿"""Application entry point. Run with: uvicorn app.main:app --reload"""
 
 import logging
 from collections.abc import AsyncIterator
@@ -6,7 +6,13 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from app.api import flood_events, health, resource_inventory, resource_needs
+from app.api import (
+    affected_locations,
+    flood_events,
+    health,
+    resource_inventory,
+    resource_needs,
+)
 from app.core.config import get_settings
 from app.core.errors import register_exception_handlers
 from app.core.logging import configure_logging
@@ -18,6 +24,7 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Create one MongoDB client at startup and close it at shutdown."""
+
     settings = get_settings()
     configure_logging(settings.log_level)
     client = create_mongo_client(settings)
@@ -37,6 +44,7 @@ def create_app() -> FastAPI:
     app.include_router(flood_events.router)
     app.include_router(resource_needs.router)
     app.include_router(resource_inventory.router)
+    app.include_router(affected_locations.router)
     return app
 
 
