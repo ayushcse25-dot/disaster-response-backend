@@ -9,6 +9,8 @@ from app.models.response_team import ResponseTeam
 from app.repositories.response_team_repository import ResponseTeamRepository
 from app.schemas.response_team import (
     ResponseTeamCreate,
+    ResponseTeamLocationUpdate,
+    ResponseTeamStatusUpdate,
     ResponseTeamResponse,
 )
 from app.services.response_team_service import ResponseTeamService
@@ -113,3 +115,66 @@ async def list_response_teams(
         ResponseTeamResponse.model_validate(team.model_dump())
         for team in teams
     ]
+
+
+@router.patch(
+    "/api/v1/response-teams/{team_id}/status",
+    response_model=ResponseTeamResponse,
+)
+async def update_response_team_status(
+    team_id: str,
+    payload: ResponseTeamStatusUpdate,
+    service: ResponseTeamService = Depends(get_response_team_service),
+) -> ResponseTeamResponse:
+    """Record an explicit team status and availability confirmation."""
+
+    try:
+        team = await service.update_team_status(
+            team_id,
+            status=payload.status,
+            availability_confirmed=payload.availability_confirmed,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=str(exc),
+        ) from exc
+
+    if team is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Response team '{team_id}' does not exist.",
+        )
+
+    return ResponseTeamResponse.model_validate(team.model_dump())
+
+
+@router.patch(
+    "/api/v1/response-teams/{team_id}/location",
+    response_model=ResponseTeamResponse,
+)
+async def update_response_team_location(
+    team_id: str,
+    payload: ResponseTeamLocationUpdate,
+    service: ResponseTeamService = Depends(get_response_team_service),
+) -> ResponseTeamResponse:
+    """Update team location without changing operational availability."""
+
+    try:
+        team = await service.update_team_location(
+            team_id,
+            current_location=payload.current_location,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=str(exc),
+        ) from exc
+
+    if team is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Response team '{team_id}' does not exist.",
+        )
+
+    return ResponseTeamResponse.model_validate(team.model_dump())

@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.models.flood_event import GeoLocation
 from app.models.response_team import TeamCapability, TeamStatus
@@ -18,6 +18,47 @@ class ResponseTeamCreate(BaseModel):
     capabilities: list[TeamCapability] = Field(default_factory=list)
     equipment: list[str] = Field(default_factory=list)
     personnel_count: int = Field(ge=0)
+
+
+class ResponseTeamStatusUpdate(BaseModel):
+    """Explicitly report operational status and availability."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    status: TeamStatus
+    availability_confirmed: bool
+
+    @model_validator(mode="after")
+    def validate_availability(self):
+        if self.status in {TeamStatus.ASSIGNED, TeamStatus.DEPLOYED}:
+            raise ValueError(
+                "Assignment and deployment status must be managed by the "
+                "assignment workflow."
+            )
+
+        if self.status == TeamStatus.AVAILABLE and not self.availability_confirmed:
+            raise ValueError(
+                "AVAILABLE status requires explicit availability confirmation."
+            )
+
+        if self.status in {
+            TeamStatus.UNKNOWN,
+            TeamStatus.UNAVAILABLE,
+            TeamStatus.OFFLINE,
+        } and self.availability_confirmed:
+            raise ValueError(
+                "This status cannot be marked as availability-confirmed."
+            )
+
+        return self
+
+
+class ResponseTeamLocationUpdate(BaseModel):
+    """Report a team's current location."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    current_location: GeoLocation
 
 
 class ResponseTeamResponse(BaseModel):

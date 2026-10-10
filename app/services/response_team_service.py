@@ -52,3 +52,65 @@ class ResponseTeamService:
             limit=limit,
             skip=skip,
         )
+
+    async def update_team_status(
+        self,
+        team_id: str,
+        *,
+        status,
+        availability_confirmed: bool,
+    ) -> ResponseTeam | None:
+        """Update status and confirmation with server-generated timestamps."""
+
+        from datetime import datetime, timezone
+
+        from app.models.response_team import TeamStatus
+
+        if not team_id or not team_id.strip():
+            raise ValueError("Team ID cannot be empty.")
+
+        if status in {TeamStatus.ASSIGNED, TeamStatus.DEPLOYED}:
+            raise ValueError(
+                "Assignment and deployment status must be managed by the "
+                "assignment workflow."
+            )
+
+        if status == TeamStatus.AVAILABLE and not availability_confirmed:
+            raise ValueError(
+                "AVAILABLE status requires explicit availability confirmation."
+            )
+
+        if status in {
+            TeamStatus.UNKNOWN,
+            TeamStatus.UNAVAILABLE,
+            TeamStatus.OFFLINE,
+        } and availability_confirmed:
+            raise ValueError(
+                "This status cannot be marked as availability-confirmed."
+            )
+
+        return await self.repository.update_status(
+            team_id,
+            status=status,
+            availability_confirmed=availability_confirmed,
+            updated_at=datetime.now(timezone.utc),
+        )
+
+    async def update_team_location(
+        self,
+        team_id: str,
+        *,
+        current_location,
+    ) -> ResponseTeam | None:
+        """Update location without implicitly confirming availability."""
+
+        from datetime import datetime, timezone
+
+        if not team_id or not team_id.strip():
+            raise ValueError("Team ID cannot be empty.")
+
+        return await self.repository.update_location(
+            team_id,
+            current_location=current_location,
+            updated_at=datetime.now(timezone.utc),
+        )

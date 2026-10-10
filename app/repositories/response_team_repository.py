@@ -76,3 +76,83 @@ class ResponseTeamRepository:
             teams.append(ResponseTeam.model_validate(document))
 
         return teams
+
+    async def update_status(
+        self,
+        team_id: str,
+        *,
+        status,
+        availability_confirmed: bool,
+        updated_at,
+    ) -> ResponseTeam | None:
+        """Update operational status without changing assignment state."""
+
+        from pymongo import ReturnDocument
+
+        query = {"_id": team_id}
+
+        # The assignment condition is checked atomically with the update.
+        # This prevents a currently assigned team from being marked AVAILABLE.
+        if status.value == "AVAILABLE":
+            query["current_assignment_id"] = None
+
+        document = await self.collection.find_one_and_update(
+            query,
+            {
+                "$set": {
+                    "status": status.value,
+                    "availability_confirmed": availability_confirmed,
+                    "last_status_update": updated_at.isoformat(),
+                    "updated_at": updated_at.isoformat(),
+                }
+            },
+            return_document=ReturnDocument.AFTER,
+        )
+
+        if document is None:
+            existing = await self.collection.find_one({"_id": team_id})
+
+            if existing is None:
+                return None
+
+            if (
+                status.value == "AVAILABLE"
+                and existing.get("current_assignment_id") is not None
+            ):
+                raise ValueError(
+                    "A team with a current assignment cannot be marked AVAILABLE."
+                )
+
+            return None
+
+        document["team_id"] = document.pop("_id")
+        return ResponseTeam.model_validate(document)
+
+    async def update_location(
+        self,
+        team_id: str,
+        *,
+        current_location,
+        updated_at,
+    ) -> ResponseTeam | None:
+        """Update location without changing status or availability."""
+
+        from pymongo import ReturnDocument
+
+        document = await self.collection.find_one_and_update(
+            {"_id": team_id},
+            {
+                "$set": {
+                    "current_location": current_location.model_dump(mode="json"),
+                    "last_location_update": updated_at.isoformat(),
+                    "updated_at": updated_at.isoformat(),
+                }
+            },
+            return_document=ReturnDocument.AFTER,
+        )
+
+        if document is None:
+            return None
+
+        document["team_id"] = document.pop("_id")
+        return ResponseTeam.model_validate(document)
