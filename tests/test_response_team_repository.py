@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from pymongo.errors import DuplicateKeyError
 
+from app.models.flood_event import GeoLocation
 from app.models.response_team import (
     ResponseTeam,
     TeamCapability,
@@ -158,3 +159,205 @@ async def test_list_teams_rejects_empty_organisation(repository):
 
     with pytest.raises(ValueError, match="Organisation ID cannot be empty"):
         await repo.list_by_organisation("   ")
+
+def make_mongo_document(team: ResponseTeam, **overrides) -> dict:
+    """Create an independent MongoDB-shaped document for repository tests."""
+
+    document = team.model_dump(mode="json")
+    document["_id"] = document.pop("team_id")
+    document.update(overrides)
+    return document
+
+
+@pytest.mark.asyncio
+async def test_update_status_saves_confirmation_and_timestamps(
+    repository,
+    sample_team,
+):
+    from pymongo import ReturnDocument
+
+    repo, collection = repository
+    now = datetime.now(timezone.utc)
+    document = make_mongo_document(
+        sample_team,
+        status=TeamStatus.AVAILABLE.value,
+        availability_confirmed=True,
+        last_status_update=now.isoformat(),
+        updated_at=now.isoformat(),
+    )
+    collection.find_one_and_update = AsyncMock(return_value=document)
+
+    result = await repo.update_status(
+        sample_team.team_id,
+        status=TeamStatus.AVAILABLE,
+        availability_confirmed=True,
+        updated_at=now,
+    )
+
+    collection.find_one_and_update.assert_awaited_once_with(
+        {
+            "_id": sample_team.team_id,
+            "current_assignment_id": None,
+        },
+        {
+            "$set": {
+                "status": "AVAILABLE",
+                "availability_confirmed": True,
+                "last_status_update": now.isoformat(),
+                "updated_at": now.isoformat(),
+            }
+        },
+        return_document=ReturnDocument.AFTER,
+    )
+    assert result is not None
+    assert result.team_id == sample_team.team_id
+    assert result.status == TeamStatus.AVAILABLE
+    assert result.availability_confirmed is True
+    assert result.last_status_update == now
+
+
+@pytest.mark.asyncio
+async def test_update_status_does_not_add_assignment_filter_for_unavailable_team(
+    repository,
+    sample_team,
+):
+    from pymongo import ReturnDocument
+
+    repo, collection = repository
+    now = datetime.now(timezone.utc)
+    document = make_mongo_document(
+        sample_team,
+        status=TeamStatus.UNAVAILABLE.value,
+        availability_confirmed=False,
+        last_status_update=now.isoformat(),
+        updated_at=now.isoformat(),
+    )
+    collection.find_one_and_update = AsyncMock(return_value=document)
+
+    result = await repo.update_status(
+        sample_team.team_id,
+        status=TeamStatus.UNAVAILABLE,
+        availability_confirmed=False,
+        updated_at=now,
+    )
+
+    query = collection.find_one_and_update.await_args.args[0]
+    assert query == {"_id": sample_team.team_id}
+    assert collection.find_one_and_update.await_args.kwargs[
+        "return_document"
+    ] == ReturnDocument.AFTER
+    assert result is not None
+    assert result.status == TeamStatus.UNAVAILABLE
+    assert result.availability_confirmed is False
+
+
+@pytest.mark.asyncio
+async def test_update_status_returns_none_for_missing_team(
+    repository,
+):
+    repo, collection = repository
+    collection.find_one_and_update = AsyncMock(return_value=None)
+    collection.find_one.return_value = None
+
+    result = await repo.update_status(
+        "missing-team",
+        status=TeamStatus.UNAVAILABLE,
+        availability_confirmed=False,
+        updated_at=datetime.now(timezone.utc),
+    )
+
+    assert result is None
+    collection.find_one.assert_awaited_once_with({"_id": "missing-team"})
+
+
+@pytest.mark.asyncio
+async def test_update_status_rejects_available_for_assigned_team(
+    repository,
+    sample_team,
+):
+    repo, collection = repository
+    collection.find_one_and_update = AsyncMock(return_value=None)
+    collection.find_one.return_value = {
+        "_id": sample_team.team_id,
+        "current_assignment_id": "assignment-001",
+    }
+
+    with pytest.raises(
+        ValueError,
+        match="current assignment cannot be marked AVAILABLE",
+    ):
+        await repo.update_status(
+            sample_team.team_id,
+            status=TeamStatus.AVAILABLE,
+            availability_confirmed=True,
+            updated_at=datetime.now(timezone.utc),
+        )
+
+    query = collection.find_one_and_update.await_args.args[0]
+    assert query == {
+        "_id": sample_team.team_id,
+        "current_assignment_id": None,
+    }
+    collection.find_one.assert_awaited_once_with(
+        {"_id": sample_team.team_id}
+    )
+
+
+@pytest.mark.asyncio
+async def test_update_location_changes_coordinates_without_changing_status(
+    repository,
+    sample_team,
+):
+    from pymongo import ReturnDocument
+
+    repo, collection = repository
+    now = datetime.now(timezone.utc)
+    location = GeoLocation(latitude=26.0, longitude=85.0)
+    document = make_mongo_document(
+        sample_team,
+        current_location=location.model_dump(mode="json"),
+        last_location_update=now.isoformat(),
+        updated_at=now.isoformat(),
+        status=TeamStatus.UNKNOWN.value,
+        availability_confirmed=False,
+    )
+    collection.find_one_and_update = AsyncMock(return_value=document)
+
+    result = await repo.update_location(
+        sample_team.team_id,
+        current_location=location,
+        updated_at=now,
+    )
+
+    collection.find_one_and_update.assert_awaited_once_with(
+        {"_id": sample_team.team_id},
+        {
+            "$set": {
+                "current_location": location.model_dump(mode="json"),
+                "last_location_update": now.isoformat(),
+                "updated_at": now.isoformat(),
+            }
+        },
+        return_document=ReturnDocument.AFTER,
+    )
+    assert result is not None
+    assert result.team_id == sample_team.team_id
+    assert result.current_location == location
+    assert result.last_location_update == now
+    assert result.status == TeamStatus.UNKNOWN
+    assert result.availability_confirmed is False
+
+
+@pytest.mark.asyncio
+async def test_update_location_returns_none_for_missing_team(repository):
+    repo, collection = repository
+    collection.find_one_and_update = AsyncMock(return_value=None)
+
+    result = await repo.update_location(
+        "missing-team",
+        current_location=GeoLocation(latitude=26.0, longitude=85.0),
+        updated_at=datetime.now(timezone.utc),
+    )
+
+    assert result is None
+    collection.find_one_and_update.assert_awaited_once()
