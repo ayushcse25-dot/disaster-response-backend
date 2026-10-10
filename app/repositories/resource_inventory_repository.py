@@ -1,6 +1,7 @@
 ﻿"""MongoDB repository for resource inventory."""
 
 from typing import Any
+from app.exceptions import PlanningSnapshotError
 
 from pymongo.errors import DuplicateKeyError
 
@@ -47,6 +48,19 @@ class ResourceInventoryRepository:
         document["inventory_id"] = document.pop("_id")
 
         return ResourceInventory.model_validate(document)
+
+    async def list_for_planning(self, *, max_records: int = 5000) -> list[ResourceInventory]:
+        """Load a complete bounded snapshot, failing rather than truncating."""
+        if max_records < 1:
+            raise ValueError("max_records must be positive.")
+        docs = await self.collection.find({}).limit(max_records + 1).to_list(length=max_records + 1)
+        if len(docs) > max_records:
+            raise PlanningSnapshotError("Inventory snapshot exceeds the planning limit.")
+        result = []
+        for doc in docs:
+            doc["inventory_id"] = doc.pop("_id")
+            result.append(ResourceInventory.model_validate(doc))
+        return result
 
     async def list_by_organisation(
         self,

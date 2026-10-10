@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app.api import (
+    allocation_plans,
     affected_locations,
     flood_events,
     health,
@@ -42,6 +43,7 @@ def create_app() -> FastAPI:
     app = FastAPI(title="Disaster Response Platform API", lifespan=lifespan)
     register_exception_handlers(app)
     app.include_router(health.router)
+    app.include_router(allocation_plans.router)
     app.include_router(flood_events.router)
     app.include_router(resource_needs.router)
     app.include_router(resource_inventory.router)

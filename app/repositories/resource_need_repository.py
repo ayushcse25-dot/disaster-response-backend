@@ -1,6 +1,7 @@
 """MongoDB repository for resource needs."""
 
 from typing import Any
+from app.exceptions import PlanningSnapshotError
 
 from pymongo.errors import DuplicateKeyError
 
@@ -41,6 +42,19 @@ class ResourceNeedRepository:
         document["need_id"] = document.pop("_id")
 
         return ResourceNeed.model_validate(document)
+
+    async def list_for_planning(self, *, max_records: int = 5000) -> list[ResourceNeed]:
+        """Load a complete bounded snapshot, failing rather than truncating."""
+        if max_records < 1:
+            raise ValueError("max_records must be positive.")
+        docs = await self.collection.find({}).limit(max_records + 1).to_list(length=max_records + 1)
+        if len(docs) > max_records:
+            raise PlanningSnapshotError("Resource-need snapshot exceeds the planning limit.")
+        result = []
+        for doc in docs:
+            doc["need_id"] = doc.pop("_id")
+            result.append(ResourceNeed.model_validate(doc))
+        return result
 
     async def list_by_event(
         self,

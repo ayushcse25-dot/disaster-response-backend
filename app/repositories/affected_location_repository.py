@@ -1,6 +1,7 @@
 ﻿"""MongoDB repository for affected locations."""
 
 from typing import Any
+from app.exceptions import PlanningSnapshotError
 
 from pymongo.errors import DuplicateKeyError
 
@@ -47,6 +48,19 @@ class AffectedLocationRepository:
         document["location_id"] = document.pop("_id")
 
         return AffectedLocation.model_validate(document)
+
+    async def list_for_planning(self, *, max_records: int = 5000) -> list[AffectedLocation]:
+        """Load a complete bounded snapshot, failing rather than truncating."""
+        if max_records < 1:
+            raise ValueError("max_records must be positive.")
+        docs = await self.collection.find({}).limit(max_records + 1).to_list(length=max_records + 1)
+        if len(docs) > max_records:
+            raise PlanningSnapshotError("Affected-location snapshot exceeds the planning limit.")
+        result = []
+        for doc in docs:
+            doc["location_id"] = doc.pop("_id")
+            result.append(AffectedLocation.model_validate(doc))
+        return result
 
     async def list_by_event(
         self,

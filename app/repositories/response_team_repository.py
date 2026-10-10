@@ -1,6 +1,7 @@
 ﻿"""MongoDB repository for response teams."""
 
 from typing import Any
+from app.exceptions import PlanningSnapshotError
 
 from pymongo.errors import DuplicateKeyError
 
@@ -41,6 +42,19 @@ class ResponseTeamRepository:
         document["team_id"] = document.pop("_id")
 
         return ResponseTeam.model_validate(document)
+
+    async def list_for_planning(self, *, max_records: int = 5000) -> list[ResponseTeam]:
+        """Load a complete bounded snapshot, failing rather than truncating."""
+        if max_records < 1:
+            raise ValueError("max_records must be positive.")
+        docs = await self.collection.find({}).limit(max_records + 1).to_list(length=max_records + 1)
+        if len(docs) > max_records:
+            raise PlanningSnapshotError("Response-team snapshot exceeds the planning limit.")
+        result = []
+        for doc in docs:
+            doc["team_id"] = doc.pop("_id")
+            result.append(ResponseTeam.model_validate(doc))
+        return result
 
     async def list_by_organisation(
         self,
