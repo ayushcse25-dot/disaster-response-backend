@@ -1,4 +1,4 @@
-﻿"""Application entry point. Run with: uvicorn app.main:app --reload"""
+"""Application entry point. Run with: uvicorn app.main:app --reload"""
 
 import logging
 from collections.abc import AsyncIterator
@@ -12,6 +12,7 @@ from app.api import (
     health,
     resource_inventory,
     resource_needs,
+    response_teams,
 )
 from app.core.config import get_settings
 from app.core.errors import register_exception_handlers
@@ -45,6 +46,7 @@ def create_app() -> FastAPI:
     app.include_router(resource_needs.router)
     app.include_router(resource_inventory.router)
     app.include_router(affected_locations.router)
+    app.include_router(response_teams.router)
     return app
 
 
