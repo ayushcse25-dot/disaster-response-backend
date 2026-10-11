@@ -130,6 +130,8 @@ All business routes are under `/api/v1`. Responses use `snake_case`; lists are p
 | GET | `/health/live`, `/health/ready` | public |
 | POST | `/api/v1/auth/login`, `/api/v1/auth/worker-login` | public |
 | GET | `/api/v1/me` | any signed-in user |
+| POST | `/api/v1/ingestion/run` | authority |
+| GET | `/api/v1/ingestion/status` | staff |
 | POST, GET | `/api/v1/ngos/{ngo_id}/workers` | NGO admin (own NGO), authority |
 | POST | `/api/v1/ngos/{ngo_id}/workers/{worker_id}/disable` | NGO admin (own NGO), authority |
 | POST | `/api/v1/orchestration/run` `{event_id}` | authority |
@@ -162,6 +164,54 @@ All business routes are under `/api/v1`. Responses use `snake_case`; lists are p
 | POST | `/api/v1/tasks/{task_id}/acknowledge`, `/start`, `/problem`, `/submit` | assigned worker |
 | POST | `/api/v1/tasks/{task_id}/verify`, `/reject` | NGO admin, authority |
 | POST | `/api/v1/demo/reset`, `/api/v1/demo/step`; GET `/api/v1/demo/state` | authority, `DEMO_ENABLED=true` |
+
+## Real data ingestion (one source)
+
+Source: **NDMA SACHET CAP alerts**, `https://sachet.ndma.gov.in/cap_public_website/rss/rss_india.xml`
+(RSS 2.0, the feed declares `<copyright>public domain</copyright>`). Each RSS item links to a
+CAP 1.2 alert (`FetchXMLFile?identifier=...`) with event type, severity, `sent` time and
+`areaDesc`. Registered in the source registry as `ndma-sachet-cap` (DISASTER_MANAGEMENT,
+APPROVED, `is_sample: false`) on the first run.
+
+```bash
+# manual run (authority token)
+curl -X POST -H "Authorization: Bearer $TOKEN" localhost:8000/api/v1/ingestion/run
+curl -H "Authorization: Bearer $TOKEN" localhost:8000/api/v1/ingestion/status
+# background loop, off by default
+INGESTION_ENABLED=true INGESTION_INTERVAL_MINUTES=30 python -m uvicorn app.main:app
+```
+
+How a run works (`app/services/ingestion/`):
+- `fetcher.py`: HTTPS GET with a 15 s timeout and 2 retries (exponential backoff); only
+  `sachet.ndma.gov.in` is fetched, since CAP links come from feed content.
+- `sachet.py` (pure, tested against saved real payloads in `tests/fixtures/`): RSS titles are
+  filtered with a flood regex (flood, inundation, waterlogging, danger/warning level, बाढ़,
+  जलभराव; "heavy rain" alone does not count), then the CAP alert must be a Flood event or
+  contain flood terms. State and district come from `areaDesc`
+  ("River, Station, District, State"); alerts with no recognisable Indian state are skipped,
+  never guessed. Up to 50 new alerts are fetched per run.
+- Each item becomes a `FloodObservation` with `source_id`, `observed_at` (CAP `sent`),
+  `retrieved_at`, `source_url`, `summary`, `is_sample: false` and
+  `dedupe_key = ndma-sachet-cap:<guid>` (unique index), so reruns add nothing new.
+- `association.py`: an observation joins an existing real (non-sample) FLOOD event that is
+  CANDIDATE or ACTIVE, in the **same state and district**, within 72 h of that event's
+  `last_observed_at`. Otherwise a new `CANDIDATE` / `UNVERIFIED` event (`ing-...`) is created.
+  State alone never matches, nothing is verified automatically, and every observation is kept
+  (conflicting ones included).
+- Status (`GET /api/v1/ingestion/status`): per source `status` (AVAILABLE, DEGRADED,
+  UNAVAILABLE, NEVER_RUN), `last_run_at`, `last_success_at`, `last_error` (exception class
+  only), `last_error_at`, `last_counts`, `total_inserted`.
+- On failure (network, HTTP, malformed XML) only the status record changes: existing
+  observations and events stay as they were and no observation is created.
+
+## Real vs sample data
+
+Seeded records have `is_sample: true`; ingested and user-created records have
+`is_sample: false`. Every response includes `is_sample`. These list routes accept
+`?include_sample=false` to return only real records (default `true` returns both, labelled):
+`GET /api/v1/flood-events`, `/flood-events/{id}/observations`,
+`/organisations/{id}/resource-inventory`, `/organisations/{id}/response-teams`,
+`/flood-events/{id}/allocation-plans`.
 
 ## How the pipeline works
 
@@ -272,6 +322,8 @@ Responses never contain connection strings, hostnames or driver error text.
 See `.env.example`. `MONGODB_URI` is required. `MONGODB_DB_NAME` defaults to
 `disaster_response`. `AUTH_SECRET` signs tokens (the built-in default is for local
 development only). `TOKEN_TTL_MINUTES` defaults to 720. `DEMO_ENABLED` defaults to false.
+`INGESTION_ENABLED` (default false) starts the background ingestion loop every
+`INGESTION_INTERVAL_MINUTES` (default 30, minimum 5).
 `LOG_LEVEL` must be uppercase (`DEBUG`, `INFO`, `WARNING`, `ERROR`). Never commit `.env`.
 
 ## Status
@@ -283,6 +335,7 @@ Built (MVP, runs locally):
 - Transactional human approval and rejection; field tasks with history.
 - Staff and worker login, role and NGO scope checks, worker creation and disabling.
 - Sample seed and demo director.
+- Real data ingestion from one source (NDMA SACHET CAP), with `include_sample` filtering.
 
 NOT built:
 - Citizen OTP login.
