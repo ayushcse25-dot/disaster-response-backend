@@ -1,4 +1,4 @@
-﻿"""Tests for the resource inventory service."""
+"""Tests for the resource inventory service."""
 
 from unittest.mock import AsyncMock
 
@@ -133,7 +133,7 @@ async def test_list_inventory(service, sample_inventory):
     repository.list_by_organisation.assert_awaited_once_with(
         sample_inventory.organisation_id,
         limit=10,
-        skip=0,
+        skip=0, include_sample=True,
     )
 
 

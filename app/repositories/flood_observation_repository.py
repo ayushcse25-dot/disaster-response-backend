@@ -2,6 +2,7 @@
 
 from typing import Any
 
+from app.repositories.sample_filter import with_sample_filter
 from app.models.flood_observation import FloodObservation
 
 
@@ -19,6 +20,7 @@ class FloodObservationRepository:
         *,
         limit: int = 50,
         skip: int = 0,
+        include_sample: bool = True,
     ) -> list[FloodObservation]:
         """List observations linked to a flood event, newest observed first."""
 
@@ -32,7 +34,7 @@ class FloodObservationRepository:
             raise ValueError("skip cannot be negative.")
 
         cursor = (
-            self.collection.find({"event_id": event_id})
+            self.collection.find(with_sample_filter({"event_id": event_id}, include_sample))
             .sort("observed_at", -1)
             .skip(skip)
             .limit(limit)

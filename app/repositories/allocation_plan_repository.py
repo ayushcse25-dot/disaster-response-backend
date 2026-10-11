@@ -2,6 +2,7 @@
 
 from typing import Any
 from pymongo.errors import DuplicateKeyError
+from app.repositories.sample_filter import with_sample_filter
 from app.models.allocation_plan import AllocationPlanRecord
 
 
@@ -37,7 +38,7 @@ class AllocationPlanRepository:
         return AllocationPlanRecord.model_validate(document)
 
     async def list_by_event(
-        self, event_id: str, *, limit: int = 20, skip: int = 0
+        self, event_id: str, *, limit: int = 20, skip: int = 0, include_sample: bool = True
     ) -> list[AllocationPlanRecord]:
         if not event_id or not event_id.strip():
             raise ValueError("Event ID cannot be empty.")
@@ -47,7 +48,7 @@ class AllocationPlanRepository:
             raise ValueError("skip cannot be negative.")
 
         cursor = (
-            self.collection.find({"event_id": event_id})
+            self.collection.find(with_sample_filter({"event_id": event_id}, include_sample))
             .sort("created_at", -1)
             .skip(skip)
             .limit(limit)

@@ -1,4 +1,4 @@
-﻿"""API endpoints for resource inventory."""
+"""API endpoints for resource inventory."""
 
 from uuid import uuid4
 
@@ -117,6 +117,7 @@ async def list_resource_inventory(
     organisation_id: str,
     limit: int = Query(default=20, ge=1, le=100),
     skip: int = Query(default=0, ge=0),
+    include_sample: bool = Query(default=True, description="false returns only real (is_sample=false) records"),
     service: ResourceInventoryService = Depends(
         get_resource_inventory_service
     ),
@@ -128,6 +129,7 @@ async def list_resource_inventory(
             organisation_id,
             limit=limit,
             skip=skip,
+            include_sample=include_sample,
         )
     except ValueError as exc:
         raise HTTPException(

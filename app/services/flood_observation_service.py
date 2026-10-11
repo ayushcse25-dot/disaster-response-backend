@@ -66,6 +66,7 @@ class FloodObservationService:
         limit: int = 50,
         skip: int = 0,
         now: datetime | None = None,
+        include_sample: bool = True,
     ) -> list[FloodObservationResponse] | None:
         """Return the event's observations, or None if the event does not exist."""
 
@@ -73,7 +74,7 @@ class FloodObservationService:
             return None
 
         observations = await self.observation_repository.list_by_event(
-            event_id, limit=limit, skip=skip
+            event_id, limit=limit, skip=skip, include_sample=include_sample
         )
         sources = await self.source_repository.get_many(
             [observation.source_id for observation in observations]

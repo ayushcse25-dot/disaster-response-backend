@@ -111,7 +111,7 @@ def test_api_lists_observations(client):
 
     assert response.status_code == 200
     assert response.json() == []
-    service.list_for_event.assert_awaited_once_with("e1", limit=10, skip=5)
+    service.list_for_event.assert_awaited_once_with("e1", limit=10, skip=5, include_sample=True)
 
 
 def test_api_returns_404_for_missing_event(client):

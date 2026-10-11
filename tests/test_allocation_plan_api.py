@@ -109,7 +109,7 @@ def test_list_allocation_plans_returns_records(
     assert response.status_code == 200
     assert [item["plan_id"] for item in response.json()] == ["plan-api-001"]
     allocation_plan_service_for_api_tests.list_plans.assert_awaited_once_with(
-        "event-api-001", limit=10, skip=5
+        "event-api-001", limit=10, skip=5, include_sample=True
     )
 
 

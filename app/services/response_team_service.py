@@ -35,6 +35,7 @@ class ResponseTeamService:
         *,
         limit: int = 20,
         skip: int = 0,
+        include_sample: bool = True,
     ) -> list[ResponseTeam]:
         """List response teams registered by an organisation."""
 
@@ -51,6 +52,7 @@ class ResponseTeamService:
             organisation_id,
             limit=limit,
             skip=skip,
+            include_sample=include_sample,
         )
 
     async def update_team_status(

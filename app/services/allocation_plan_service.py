@@ -144,12 +144,12 @@ class AllocationPlanService:
         return await self.plan_repository.get_by_id(plan_id)
 
     async def list_plans(
-        self, event_id: str, *, limit: int = 20, skip: int = 0
+        self, event_id: str, *, limit: int = 20, skip: int = 0, include_sample: bool = True
     ) -> list[AllocationPlanRecord]:
         if not event_id or not event_id.strip():
             raise ValueError("Event ID cannot be empty.")
         if await self.event_repository.get_by_id(event_id) is None:
             raise LookupError(f"Flood event '{event_id}' does not exist.")
         return await self.plan_repository.list_by_event(
-            event_id, limit=limit, skip=skip
+            event_id, limit=limit, skip=skip, include_sample=include_sample
         )

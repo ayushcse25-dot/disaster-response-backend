@@ -33,11 +33,13 @@ class FloodEventService:
         *,
         limit: int = 20,
         skip: int = 0,
+        include_sample: bool = True,
     ) -> list[FloodEvent]:
         """List flood events with pagination."""
         return await self.repository.list_events(
             limit=limit,
             skip=skip,
+            include_sample=include_sample,
         )
 
     async def severity_for_events(

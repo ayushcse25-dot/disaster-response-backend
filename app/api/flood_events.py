@@ -80,8 +80,9 @@ async def list_flood_events(
     ],
     limit: Annotated[int, Query(ge=1, le=100)] = 20,
     skip: Annotated[int, Query(ge=0)] = 0,
+    include_sample: Annotated[bool, Query(description="false returns only real (is_sample=false) records")] = True,
 ) -> list[FloodEventResponse]:
-    events = await service.list_events(limit=limit, skip=skip)
+    events = await service.list_events(limit=limit, skip=skip, include_sample=include_sample)
     severities = await service.severity_for_events(
         [event.event_id for event in events]
     )

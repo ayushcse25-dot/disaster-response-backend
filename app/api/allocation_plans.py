@@ -161,9 +161,12 @@ async def list_allocation_plans(
     user: CurrentUser,
     limit: Annotated[int, Query(ge=1, le=100)] = 20,
     skip: Annotated[int, Query(ge=0)] = 0,
+    include_sample: Annotated[bool, Query(description="false returns only real (is_sample=false) records")] = True,
 ) -> list[AllocationPlanView]:
     try:
-        records = await service.list_plans(event_id, limit=limit, skip=skip)
+        records = await service.list_plans(
+            event_id, limit=limit, skip=skip, include_sample=include_sample
+        )
         if user.role != Role.AUTHORITY:
             records = [r for r in records if r.ngo_id and r.ngo_id == user.ngo_id]
         return [await lifecycle.view(record) for record in records]

@@ -1,4 +1,4 @@
-﻿"""Additional API edge-case tests for resource inventory."""
+"""Additional API edge-case tests for resource inventory."""
 
 from unittest.mock import AsyncMock
 
@@ -196,7 +196,7 @@ def test_list_inventory_accepts_minimum_limit(
     assert response.status_code == 200
     assert response.json() == []
     inventory_service_for_edge_tests.list_inventory.assert_awaited_once_with(
-        "NGO-EDGE-001", limit=1, skip=0
+        "NGO-EDGE-001", limit=1, skip=0, include_sample=True
     )
 
 
@@ -212,7 +212,7 @@ def test_list_inventory_accepts_maximum_limit(
 
     assert response.status_code == 200
     inventory_service_for_edge_tests.list_inventory.assert_awaited_once_with(
-        "NGO-EDGE-001", limit=100, skip=0
+        "NGO-EDGE-001", limit=100, skip=0, include_sample=True
     )
 
 

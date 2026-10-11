@@ -1,4 +1,4 @@
-﻿"""API endpoints for response teams."""
+"""API endpoints for response teams."""
 
 from uuid import uuid4
 
@@ -104,6 +104,7 @@ async def list_response_teams(
     organisation_id: str,
     limit: int = Query(default=20, ge=1, le=100),
     skip: int = Query(default=0, ge=0),
+    include_sample: bool = Query(default=True, description="false returns only real (is_sample=false) records"),
     service: ResponseTeamService = Depends(get_response_team_service),
 ) -> list[ResponseTeamResponse]:
     """List response teams registered by an organisation."""
@@ -113,6 +114,7 @@ async def list_response_teams(
             organisation_id,
             limit=limit,
             skip=skip,
+            include_sample=include_sample,
         )
     except ValueError as exc:
         raise HTTPException(

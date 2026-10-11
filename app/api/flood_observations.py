@@ -39,8 +39,11 @@ async def list_flood_event_observations(
     ],
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
     skip: Annotated[int, Query(ge=0)] = 0,
+    include_sample: Annotated[bool, Query(description="false returns only real (is_sample=false) records")] = True,
 ) -> list[FloodObservationResponse]:
-    observations = await service.list_for_event(event_id, limit=limit, skip=skip)
+    observations = await service.list_for_event(
+        event_id, limit=limit, skip=skip, include_sample=include_sample
+    )
 
     if observations is None:
         raise HTTPException(

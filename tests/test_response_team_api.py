@@ -193,7 +193,7 @@ def test_list_teams_for_organisation(client_and_service):
     service.list_teams_for_organisation.assert_awaited_once_with(
         "organisation-test-001",
         limit=10,
-        skip=0,
+        skip=0, include_sample=True,
     )
 
 
