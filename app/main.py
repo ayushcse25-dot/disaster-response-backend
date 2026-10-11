@@ -14,6 +14,7 @@ from app.api import (
     resource_inventory,
     resource_needs,
     response_teams,
+    field_reports,
 )
 from app.core.config import get_settings
 from app.core.errors import register_exception_handlers
@@ -49,6 +50,7 @@ def create_app() -> FastAPI:
     app.include_router(resource_inventory.router)
     app.include_router(affected_locations.router)
     app.include_router(response_teams.router)
+    app.include_router(field_reports.router)
     return app
 
 

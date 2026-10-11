@@ -1,11 +1,12 @@
-"""Endpoints for persisted allocation proposals."""
-
+﻿"""Endpoints for allocation proposals and human approval decisions."""
 from typing import Annotated
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel, ConfigDict, Field
 from pymongo.asynchronous.database import AsyncDatabase
 
-from app.exceptions import PlanningSnapshotError
 from app.api.deps import get_database
+from app.exceptions import PlanningSnapshotError
 from app.models.allocation_plan import AllocationPlanRecord
 from app.repositories.affected_location_repository import AffectedLocationRepository
 from app.repositories.allocation_plan_repository import AllocationPlanRepository
@@ -14,8 +15,23 @@ from app.repositories.resource_inventory_repository import ResourceInventoryRepo
 from app.repositories.resource_need_repository import ResourceNeedRepository
 from app.repositories.response_team_repository import ResponseTeamRepository
 from app.services.allocation_plan_service import AllocationPlanService
+from app.services.allocation_approval_service import (
+    AllocationApprovalService,
+    ApprovalConflict,
+    ApprovalNotFound,
+    ApprovalServiceUnavailable,
+    ApprovalValidationError,
+)
 
 router = APIRouter(prefix="/api/v1", tags=["Allocation Plans"])
+
+
+class DecisionRequest(BaseModel):
+    """Decision metadata; these fields do not authenticate the caller."""
+    model_config = ConfigDict(extra="forbid")
+    actor_id: str = Field(min_length=1, max_length=100)
+    actor_type: str = Field(min_length=1, max_length=50)
+    reason: str = Field(min_length=1, max_length=3000)
 
 
 def get_allocation_plan_service(
@@ -29,6 +45,27 @@ def get_allocation_plan_service(
         inventory_repository=ResourceInventoryRepository(database),
         team_repository=ResponseTeamRepository(database),
     )
+
+
+def get_allocation_approval_service(
+    database: Annotated[AsyncDatabase, Depends(get_database)],
+) -> AllocationApprovalService:
+    return AllocationApprovalService(database)
+
+
+def _raise_approval_http_error(exc: Exception) -> None:
+    if isinstance(exc, ApprovalNotFound):
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    if isinstance(exc, ApprovalConflict):
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    if isinstance(exc, ApprovalValidationError):
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    if isinstance(exc, ApprovalServiceUnavailable):
+        raise HTTPException(
+            status_code=503,
+            detail="The decision could not be persisted; do not treat it as committed.",
+        ) from exc
+    raise exc
 
 
 @router.post(
@@ -84,3 +121,45 @@ async def get_allocation_plan(
     if record is None:
         raise HTTPException(status_code=404, detail="Allocation plan not found.")
     return record
+
+
+@router.post("/allocation-plans/{plan_id}/approve", response_model=AllocationPlanRecord)
+async def approve_allocation_plan(
+    plan_id: str,
+    request: DecisionRequest,
+    service: Annotated[
+        AllocationApprovalService, Depends(get_allocation_approval_service)
+    ],
+) -> AllocationPlanRecord:
+    try:
+        result = await service.approve(
+            plan_id, actor_id=request.actor_id, actor_type=request.actor_type,
+            reason=request.reason,
+        )
+        return AllocationPlanRecord.model_validate(result)
+    except (
+        ApprovalNotFound, ApprovalConflict, ApprovalValidationError,
+        ApprovalServiceUnavailable,
+    ) as exc:
+        _raise_approval_http_error(exc)
+
+
+@router.post("/allocation-plans/{plan_id}/reject", response_model=AllocationPlanRecord)
+async def reject_allocation_plan(
+    plan_id: str,
+    request: DecisionRequest,
+    service: Annotated[
+        AllocationApprovalService, Depends(get_allocation_approval_service)
+    ],
+) -> AllocationPlanRecord:
+    try:
+        result = await service.reject(
+            plan_id, actor_id=request.actor_id, actor_type=request.actor_type,
+            reason=request.reason,
+        )
+        return AllocationPlanRecord.model_validate(result)
+    except (
+        ApprovalNotFound, ApprovalConflict, ApprovalValidationError,
+        ApprovalServiceUnavailable,
+    ) as exc:
+        _raise_approval_http_error(exc)
