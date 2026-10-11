@@ -6,10 +6,15 @@ from unittest.mock import patch
 import pytest
 
 from app.models.affected_location import AffectedLocation
+from app.models.allocation_plan import AllocationPlanRecord
 from app.models.flood_event import FloodEvent
 from app.models.flood_observation import FloodObservation
+from app.models.resource_inventory import ResourceInventory
+from app.models.resource_need import ResourceNeed
+from app.models.response_team import ResponseTeam
 from app.models.source import SourceRegistryEntry
 from app.services.event_severity import derive_event_severity
+from app.services.resource_freshness import inventory_status_fields, team_status_fields
 from scripts import seed_sample
 from scripts.seed_sample import SeedConflictError, build_sample_documents, seed
 
@@ -56,7 +61,13 @@ def test_sample_documents_are_valid_labelled_and_prefixed():
         "flood_events": (FloodEvent, "event_id"),
         "affected_locations": (AffectedLocation, "location_id"),
         "flood_observations": (FloodObservation, "observation_id"),
+        "resource_inventory": (ResourceInventory, "inventory_id"),
+        "response_teams": (ResponseTeam, "team_id"),
+        "resource_needs": (ResourceNeed, "need_id"),
+        "allocation_plans": (AllocationPlanRecord, "plan_id"),
     }
+
+    assert set(documents) == set(models)
 
     for collection_name, items in documents.items():
         model, id_field = models[collection_name]
@@ -76,6 +87,46 @@ def test_sample_references_are_consistent():
     assert {d["event_id"] for d in documents["affected_locations"]} <= event_ids
     assert {d["event_id"] for d in documents["flood_observations"]} <= event_ids
     assert {d["source_id"] for d in documents["flood_observations"]} <= source_ids
+    location_ids = {d["_id"] for d in documents["affected_locations"]}
+    assert {d["location_id"] for d in documents["resource_needs"]} <= location_ids
+    assert {d["event_id"] for d in documents["resource_needs"]} <= event_ids
+    assert {d["event_id"] for d in documents["allocation_plans"]} <= event_ids
+
+
+def _load(model, item, id_field):
+    data = {k: v for k, v in item.items() if k != "_id"}
+    return model.model_validate({**data, id_field: item["_id"]})
+
+
+def test_sample_resources_cover_each_freshness_value():
+    documents = build_sample_documents(NOW)
+
+    inventory = [_load(ResourceInventory, d, "inventory_id") for d in documents["resource_inventory"]]
+    teams = [_load(ResponseTeam, d, "team_id") for d in documents["response_teams"]]
+
+    assert [inventory_status_fields(i, NOW).freshness for i in inventory] == [
+        "FRESH", "DUE", "STALE", "UNVERIFIED"
+    ]
+    assert [team_status_fields(t, NOW).freshness for t in teams] == ["FRESH", "DUE", "STALE"]
+
+
+def test_sample_plans_come_from_the_engine():
+    plans = {
+        d["_id"]: _load(AllocationPlanRecord, d, "plan_id")
+        for d in build_sample_documents(NOW)["allocation_plans"]
+    }
+
+    ready = plans["sample-plan-001"]
+    assert ready.plan.status == "READY"
+    assert ready.approval_status == "PENDING"
+    assert {(d.need_id, d.inventory_id, d.team_id) for d in ready.plan.decisions} == {
+        ("sample-need-001", "sample-inv-001", "sample-team-001"),
+        ("sample-need-002", "sample-inv-002", "sample-team-002"),
+    }
+    assert {u.need_id for u in ready.plan.unallocated_needs} == {
+        "sample-need-003", "sample-need-004"
+    }
+    assert plans["sample-plan-002"].plan.status == "BLOCKED"
 
 
 def test_sample_events_cover_each_severity_outcome():
@@ -101,6 +152,7 @@ async def test_seed_is_idempotent():
     assert first == second
     assert len(database["flood_events"].docs) == first["flood_events"] == 3
     assert len(database["flood_observations"].docs) == 5
+    assert len(database["allocation_plans"].docs) == first["allocation_plans"] == 2
 
 
 @pytest.mark.asyncio

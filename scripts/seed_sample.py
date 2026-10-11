@@ -1,4 +1,4 @@
-"""Seed sample flood events, affected locations, observations and sources.
+"""Seed sample flood events, locations, observations, sources, resources and plans.
 
 Usage (from the project root, with MONGODB_URI set in the environment or .env):
 
@@ -21,6 +21,7 @@ from typing import Any
 from pydantic import BaseModel
 
 from app.models.affected_location import AffectedLocation, SeverityLevel
+from app.models.allocation_plan import AllocationPlanRecord
 from app.models.enums import (
     EventStatus,
     EventVerificationStatus,
@@ -30,9 +31,19 @@ from app.models.enums import (
 )
 from app.models.flood_event import FloodEvent, GeoLocation
 from app.models.flood_observation import FloodObservation
+from app.models.resource_inventory import (
+    InventoryStatus,
+    ResourceInventory,
+    ResourceType,
+)
+from app.models.resource_need import NeedStatus, NeedType, NeedUrgency, ResourceNeed
+from app.models.response_team import ResponseTeam, TeamCapability, TeamStatus
 from app.models.source import SourceRegistryEntry
+from app.services.allocation_engine import generate_allocation_plan
+from app.services.allocation_plan_service import _planning_snapshot_digest
 
 SAMPLE_PREFIX = "sample-"
+SAMPLE_ORGANISATION_ID = "sample-org-001"
 LABEL = "SAMPLE DATA — NOT LIVE FLOOD INFORMATION."
 
 
@@ -198,11 +209,125 @@ def build_sample_documents(now: datetime) -> dict[str, list[dict[str, Any]]]:
                     "Kochi", "Kerala", ago(hours=3), EventVerificationStatus.UNVERIFIED),
     ]
 
+    # Check-in ages are chosen so each freshness value appears:
+    # inventory interval 24 h, team interval 2 h (see app/services/resource_freshness.py).
+    def stock(inventory_id: str, resource_type: ResourceType, name: str, total: float,
+              unit: str, verified: datetime | None, confirmed: bool = True) -> ResourceInventory:
+        return ResourceInventory(
+            inventory_id=inventory_id,
+            organisation_id=SAMPLE_ORGANISATION_ID,
+            resource_type=resource_type,
+            resource_name=name,
+            quantity_total=total,
+            quantity_unit=unit,
+            storage_location="Sample depot, Patna",
+            status=InventoryStatus.AVAILABLE if confirmed else InventoryStatus.UNKNOWN,
+            availability_confirmed=confirmed,
+            last_verified_at=verified,
+            created_at=ago(days=7),
+            updated_at=verified or ago(days=7),
+            is_sample=True,
+        )
+
+    inventory = [
+        stock("sample-inv-001", ResourceType.BOATS, "SAMPLE inflatable rescue boat",
+              4, "boats", ago(hours=2)),                       # FRESH
+        stock("sample-inv-002", ResourceType.DRINKING_WATER, "SAMPLE drinking water",
+              5000, "litres", ago(hours=20)),                  # DUE
+        stock("sample-inv-003", ResourceType.FOOD, "SAMPLE dry ration kits",
+              300, "kits", ago(hours=30)),                     # STALE
+        stock("sample-inv-004", ResourceType.MEDICAL_KITS, "SAMPLE first aid kits",
+              50, "kits", None, confirmed=False),               # UNVERIFIED
+    ]
+
+    def team(team_id: str, name: str, capabilities: list[TeamCapability],
+             personnel: int, updated: datetime) -> ResponseTeam:
+        return ResponseTeam(
+            team_id=team_id,
+            organisation_id=SAMPLE_ORGANISATION_ID,
+            team_name=name,
+            capabilities=capabilities,
+            personnel_count=personnel,
+            status=TeamStatus.AVAILABLE,
+            availability_confirmed=True,
+            last_status_update=updated,
+            created_at=ago(days=7),
+            updated_at=updated,
+            is_sample=True,
+        )
+
+    teams = [
+        team("sample-team-001", "SAMPLE boat crew",
+             [TeamCapability.WATER_RESCUE, TeamCapability.BOAT_OPERATIONS], 6,
+             ago(minutes=20)),                                 # FRESH
+        team("sample-team-002", "SAMPLE water distribution team",
+             [TeamCapability.WATER_DISTRIBUTION], 4, ago(minutes=100)),   # DUE
+        team("sample-team-003", "SAMPLE food distribution team",
+             [TeamCapability.FOOD_DISTRIBUTION], 5, ago(hours=5)),        # STALE
+    ]
+
+    def need(need_id: str, event_id: str, location_id: str, need_type: NeedType,
+             urgency: NeedUrgency, status: NeedStatus, quantity: float,
+             unit: str) -> ResourceNeed:
+        return ResourceNeed(
+            need_id=need_id,
+            event_id=event_id,
+            location_id=location_id,
+            need_type=need_type,
+            description=LABEL,
+            urgency=urgency,
+            status=status,
+            quantity_requested=quantity,
+            quantity_unit=unit,
+            reported_at=ago(hours=3),
+            updated_at=ago(hours=1),
+            reassessment_required=status != NeedStatus.CONFIRMED,
+            is_sample=True,
+        )
+
+    needs = [
+        need("sample-need-001", "sample-event-001", "sample-location-001", NeedType.RESCUE,
+             NeedUrgency.CRITICAL, NeedStatus.CONFIRMED, 2, "boats"),
+        need("sample-need-002", "sample-event-001", "sample-location-002",
+             NeedType.DRINKING_WATER, NeedUrgency.HIGH, NeedStatus.CONFIRMED, 2000, "litres"),
+        need("sample-need-003", "sample-event-001", "sample-location-002", NeedType.FOOD,
+             NeedUrgency.MODERATE, NeedStatus.CONFIRMED, 150, "kits"),
+        need("sample-need-004", "sample-event-001", "sample-location-001", NeedType.MEDICAL,
+             NeedUrgency.HIGH, NeedStatus.REPORTED, 20, "kits"),
+        need("sample-need-005", "sample-event-002", "sample-location-004", NeedType.SHELTER,
+             NeedUrgency.MODERATE, NeedStatus.REPORTED, 40, "kits"),
+    ]
+
+    # Plans come from the real rule-based engine, run over the sample records only.
+    def plan(plan_id: str, event: FloodEvent) -> AllocationPlanRecord:
+        version = _planning_snapshot_digest(
+            event=event, locations=locations, needs=needs, inventory=inventory, teams=teams
+        )
+        result = generate_allocation_plan(
+            event=event, locations=locations, needs=needs, inventory=inventory,
+            teams=teams, generated_at=now, inventory_state_version=version,
+        )
+        result.notes.append(LABEL)
+        return AllocationPlanRecord(
+            plan_id=plan_id, event_id=event.event_id, plan=result,
+            created_at=now, is_sample=True,
+        )
+
+    event_by_id = {event.event_id: event for event in events}
+    plans = [
+        plan("sample-plan-001", event_by_id["sample-event-001"]),   # READY
+        plan("sample-plan-002", event_by_id["sample-event-002"]),   # BLOCKED: under review
+    ]
+
     return {
         "sources": [_doc(s, "source_id") for s in sources],
         "flood_events": [_doc(e, "event_id") for e in events],
         "affected_locations": [_doc(loc, "location_id") for loc in locations],
         "flood_observations": [_doc(o, "observation_id") for o in observations],
+        "resource_inventory": [_doc(i, "inventory_id") for i in inventory],
+        "response_teams": [_doc(t, "team_id") for t in teams],
+        "resource_needs": [_doc(n, "need_id") for n in needs],
+        "allocation_plans": [_doc(p, "plan_id") for p in plans],
     }
 
 
