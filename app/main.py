@@ -10,6 +10,7 @@ from fastapi import Depends, FastAPI
 from app.api import (
     allocation_plans,
     auth,
+    demo,
     affected_locations,
     flood_events,
     flood_observations,
@@ -66,9 +67,9 @@ def create_app() -> FastAPI:
         resource_inventory, affected_locations, response_teams, field_reports,
     ):
         app.include_router(module.router, dependencies=staff)
-    app.include_router(
-        orchestration.router, dependencies=[Depends(require_roles(Role.AUTHORITY))]
-    )
+    authority = [Depends(require_roles(Role.AUTHORITY))]
+    app.include_router(orchestration.router, dependencies=authority)
+    app.include_router(demo.router, dependencies=authority)
     return app
 
 
