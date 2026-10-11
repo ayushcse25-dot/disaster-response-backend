@@ -14,6 +14,6 @@ def test_database_errors_become_a_generic_503() -> None:
     response = TestClient(test_app).get("/boom")
 
     assert response.status_code == 503
-    assert response.json() == {"detail": "Database temporarily unavailable."}
+    assert response.json() == {"detail": "Database temporarily unavailable.", "code": "DATABASE_UNAVAILABLE"}
     assert "secret-password" not in response.text
     assert "internal-host" not in response.text

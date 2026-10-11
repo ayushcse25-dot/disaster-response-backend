@@ -63,6 +63,9 @@ class ResourceNeed(BaseModel):
 
     reassessment_required: bool = True
 
+    # True only for records written by scripts/seed_sample.py; the API never sets it.
+    is_sample: bool = False
+
     @model_validator(mode="after")
     def validate_fulfilled_quantity(self) -> "ResourceNeed":
         """Prevent fulfilled quantity from exceeding a known requested quantity."""

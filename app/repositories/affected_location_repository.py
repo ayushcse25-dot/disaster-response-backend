@@ -5,7 +5,7 @@ from app.exceptions import PlanningSnapshotError
 
 from pymongo.errors import DuplicateKeyError
 
-from app.models.affected_location import AffectedLocation
+from app.models.affected_location import AffectedLocation, SeverityLevel
 
 
 class AffectedLocationRepository:
@@ -96,3 +96,26 @@ class AffectedLocationRepository:
             locations.append(AffectedLocation.model_validate(document))
 
         return locations
+
+    async def severities_by_event(
+        self,
+        event_ids: list[str],
+    ) -> dict[str, list[SeverityLevel]]:
+        """Return the severity of every affected location, grouped by event ID."""
+
+        result: dict[str, list[SeverityLevel]] = {event_id: [] for event_id in event_ids}
+
+        if not event_ids:
+            return result
+
+        cursor = self.collection.find(
+            {"event_id": {"$in": event_ids}},
+            {"event_id": 1, "severity": 1},
+        )
+
+        for document in await cursor.to_list(length=None):
+            result.setdefault(document["event_id"], []).append(
+                SeverityLevel(document.get("severity", SeverityLevel.UNKNOWN))
+            )
+
+        return result

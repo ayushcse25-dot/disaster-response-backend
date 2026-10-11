@@ -86,5 +86,5 @@ async def test_list_events(mock_repository, sample_event):
     assert result == [sample_event]
     mock_repository.list_events.assert_awaited_once_with(
         limit=10,
-        skip=0,
+        skip=0, include_sample=True,
     )

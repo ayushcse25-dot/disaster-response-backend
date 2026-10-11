@@ -54,6 +54,7 @@ async def create_affected_location(
         state=payload.state,
         district=payload.district,
         coordinates=payload.coordinates,
+        population_affected=payload.population_affected,
         severity=payload.severity,
         supporting_observation_ids=payload.supporting_observation_ids,
     )

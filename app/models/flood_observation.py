@@ -47,6 +47,15 @@ class FloodObservation(BaseModel):
         max_length=500,
     )
 
+    # Ingestion fields (app/services/ingestion/). retrieved_at is when the
+    # ingestion run fetched the item; dedupe_key makes reruns idempotent.
+    retrieved_at: datetime | None = None
+    summary: str | None = Field(default=None, max_length=1000)
+    dedupe_key: str | None = Field(default=None, max_length=200)
+
+    # True only for records written by scripts/seed_sample.py; the API never sets it.
+    is_sample: bool = False
+
     @field_validator("observed_at", "received_at")
     @classmethod
     def validate_timezone_aware_timestamp(cls, value: datetime) -> datetime:

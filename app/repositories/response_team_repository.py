@@ -1,10 +1,11 @@
-﻿"""MongoDB repository for response teams."""
+"""MongoDB repository for response teams."""
 
 from typing import Any
 from app.exceptions import PlanningSnapshotError
 
 from pymongo.errors import DuplicateKeyError
 
+from app.repositories.sample_filter import with_sample_filter
 from app.models.response_team import ResponseTeam
 
 
@@ -62,6 +63,7 @@ class ResponseTeamRepository:
         *,
         limit: int = 20,
         skip: int = 0,
+        include_sample: bool = True,
     ) -> list[ResponseTeam]:
         """List response teams registered by an organisation."""
 
@@ -75,7 +77,7 @@ class ResponseTeamRepository:
             raise ValueError("skip cannot be negative.")
 
         cursor = (
-            self.collection.find({"organisation_id": organisation_id})
+            self.collection.find(with_sample_filter({"organisation_id": organisation_id}, include_sample))
             .sort("updated_at", -1)
             .skip(skip)
             .limit(limit)

@@ -1,4 +1,4 @@
-﻿"""Transactional approval and rejection of allocation proposals.
+"""Transactional approval and rejection of allocation proposals.
 
 Approval reserves resources and assigns teams. It never dispatches teams.
 MongoDB transactions require a replica set or sharded deployment.
@@ -11,7 +11,11 @@ from uuid import uuid4
 from pymongo.errors import PyMongoError
 
 from app.models.decision_audit import DecisionAction, DecisionAudit
-from app.models.deployment_assignment import AssignmentStatus, DeploymentAssignment
+from app.models.deployment_assignment import (
+    AssignmentStatus,
+    DeploymentAssignment,
+    TaskHistoryEntry,
+)
 from app.models.enums import EventStatus, EventVerificationStatus
 from app.models.resource_inventory import InventoryStatus
 from app.models.response_team import TeamStatus
@@ -220,6 +224,17 @@ class AllocationApprovalService:
                             ),
                             status=AssignmentStatus.APPROVED,
                             recommendation_id=plan_id,
+                            ngo_id=team.get("organisation_id"),
+                            need_id=need_id,
+                            inventory_id=inventory_id,
+                            quantity=quantity,
+                            quantity_unit=unit,
+                            history=[TaskHistoryEntry(
+                                actor_id=actor_id, actor_role=actor_type, action="CREATE",
+                                to_status=AssignmentStatus.APPROVED, at=now,
+                                note="Work order created on plan approval.",
+                            )],
+                            is_sample=bool(plan_doc.get("is_sample")),
                             approved_by=actor_id,
                             approved_at=now,
                             created_at=now,

@@ -29,6 +29,8 @@ class AffectedLocation(BaseModel):
     district: str | None = Field(default=None, max_length=100)
 
     coordinates: GeoLocation | None = None
+    # People affected at this location; None when not yet assessed.
+    population_affected: int | None = Field(default=None, ge=0)
 
     # UNKNOWN is used when the available evidence is insufficient.
     severity: SeverityLevel = SeverityLevel.UNKNOWN
@@ -46,3 +48,6 @@ class AffectedLocation(BaseModel):
         default=None,
         max_length=1000,
     )
+
+    # True only for records written by scripts/seed_sample.py; the API never sets it.
+    is_sample: bool = False

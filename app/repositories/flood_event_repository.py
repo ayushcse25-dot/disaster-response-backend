@@ -2,6 +2,7 @@ from typing import Any
 
 from pymongo.errors import DuplicateKeyError
 
+from app.repositories.sample_filter import with_sample_filter
 from app.models.flood_event import FloodEvent
 
 
@@ -42,6 +43,7 @@ class FloodEventRepository:
         *,
         limit: int = 20,
         skip: int = 0,
+        include_sample: bool = True,
     ) -> list[FloodEvent]:
         """Return validated flood events, newest first."""
         if not 1 <= limit <= 100:
@@ -51,7 +53,7 @@ class FloodEventRepository:
             raise ValueError("skip cannot be negative.")
 
         cursor = (
-            self.collection.find({})
+            self.collection.find(with_sample_filter({}, include_sample))
             .sort("created_at", -1)
             .skip(skip)
             .limit(limit)

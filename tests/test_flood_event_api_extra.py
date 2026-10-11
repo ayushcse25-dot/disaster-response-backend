@@ -1,4 +1,4 @@
-﻿"""Additional API tests for flood event endpoints."""
+"""Additional API tests for flood event endpoints."""
 
 from unittest.mock import AsyncMock
 
@@ -13,6 +13,7 @@ from app.models.flood_event import FloodEvent
 def flood_service_for_api_tests(client):
     """Override the flood event service with an isolated mock."""
     service = AsyncMock()
+    service.severity_for_events.return_value = {}
     app.dependency_overrides[get_flood_event_service] = lambda: service
     yield service
     app.dependency_overrides.pop(get_flood_event_service, None)
@@ -280,7 +281,7 @@ def test_list_flood_events_returns_events(
     assert response.json()[0]["event_id"] == "flood-api-test-001"
     flood_service_for_api_tests.list_events.assert_awaited_once_with(
         limit=20,
-        skip=0,
+        skip=0, include_sample=True,
     )
 
 
@@ -343,5 +344,5 @@ def test_list_flood_events_accepts_valid_pagination(
     assert response.status_code == 200
     flood_service_for_api_tests.list_events.assert_awaited_once_with(
         limit=limit,
-        skip=skip,
+        skip=skip, include_sample=True,
     )

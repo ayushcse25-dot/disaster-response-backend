@@ -27,6 +27,18 @@ class Settings(BaseSettings):
     mongodb_db_name: str = Field(default="disaster_response", min_length=1)
     mongodb_server_selection_timeout_ms: int = Field(default=5000, ge=100)
 
+    # Signs access tokens. The default is for local development only; set
+    # AUTH_SECRET to a long random value anywhere else.
+    auth_secret: SecretStr = SecretStr("dev-only-insecure-auth-secret-change-me")
+    token_ttl_minutes: int = Field(default=720, ge=1)
+
+    # Background ingestion loop (POST /api/v1/ingestion/run works regardless).
+    ingestion_enabled: bool = False
+    ingestion_interval_minutes: int = Field(default=30, ge=5)
+
+    # Enables /api/v1/demo/*. Off unless explicitly set.
+    demo_enabled: bool = False
+
     @field_validator("mongodb_uri")
     @classmethod
     def _check_mongodb_uri(cls, value: SecretStr) -> SecretStr:

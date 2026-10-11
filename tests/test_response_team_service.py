@@ -1,4 +1,4 @@
-﻿"""Unit tests for the response-team service."""
+"""Unit tests for the response-team service."""
 
 from unittest.mock import AsyncMock
 
@@ -113,7 +113,7 @@ async def test_list_teams_for_organisation(service, sample_team):
     repository.list_by_organisation.assert_awaited_once_with(
         sample_team.organisation_id,
         limit=10,
-        skip=5,
+        skip=5, include_sample=True,
     )
 
 

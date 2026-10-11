@@ -1,4 +1,4 @@
-﻿"""Business logic for resource inventory."""
+"""Business logic for resource inventory."""
 
 from app.models.resource_inventory import (
     InventoryStatus,
@@ -58,6 +58,7 @@ class ResourceInventoryService:
         *,
         limit: int = 20,
         skip: int = 0,
+        include_sample: bool = True,
     ) -> list[ResourceInventory]:
         """List inventory belonging to an organisation."""
 
@@ -68,4 +69,5 @@ class ResourceInventoryService:
             organisation_id,
             limit=limit,
             skip=skip,
+            include_sample=include_sample,
         )

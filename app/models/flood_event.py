@@ -39,4 +39,10 @@ class FloodEvent(BaseModel):
 
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
+
+    # Latest observed_at among linked ingested observations (event association window).
+    last_observed_at: datetime | None = None
+
+    # True only for records written by scripts/seed_sample.py; the API never sets it.
+    is_sample: bool = False
     

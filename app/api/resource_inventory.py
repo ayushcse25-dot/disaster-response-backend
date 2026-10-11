@@ -1,4 +1,4 @@
-﻿"""API endpoints for resource inventory."""
+"""API endpoints for resource inventory."""
 
 from uuid import uuid4
 
@@ -16,12 +16,21 @@ from app.schemas.resource_inventory import (
     ResourceInventoryCreate,
     ResourceInventoryResponse,
 )
+from app.services.resource_freshness import inventory_status_fields
 from app.services.resource_inventory_service import (
     ResourceInventoryService,
 )
 
 
 router = APIRouter(tags=["Resource Inventory"])
+
+
+def to_response(item: ResourceInventory) -> ResourceInventoryResponse:
+    """Combine a stored record with its derived freshness and eligibility."""
+
+    return ResourceInventoryResponse.model_validate(
+        {**item.model_dump(), **inventory_status_fields(item).model_dump()}
+    )
 
 
 def get_resource_inventory_service(
@@ -68,7 +77,7 @@ async def create_resource_inventory(
             detail=str(exc),
         ) from exc
 
-    return ResourceInventoryResponse.model_validate(created.model_dump())
+    return to_response(created)
 
 
 @router.get(
@@ -97,7 +106,7 @@ async def get_resource_inventory(
             detail="Inventory record not found.",
         )
 
-    return ResourceInventoryResponse.model_validate(inventory.model_dump())
+    return to_response(inventory)
 
 
 @router.get(
@@ -108,6 +117,7 @@ async def list_resource_inventory(
     organisation_id: str,
     limit: int = Query(default=20, ge=1, le=100),
     skip: int = Query(default=0, ge=0),
+    include_sample: bool = Query(default=True, description="false returns only real (is_sample=false) records"),
     service: ResourceInventoryService = Depends(
         get_resource_inventory_service
     ),
@@ -119,6 +129,7 @@ async def list_resource_inventory(
             organisation_id,
             limit=limit,
             skip=skip,
+            include_sample=include_sample,
         )
     except ValueError as exc:
         raise HTTPException(
@@ -126,7 +137,4 @@ async def list_resource_inventory(
             detail=str(exc),
         ) from exc
 
-    return [
-        ResourceInventoryResponse.model_validate(record.model_dump())
-        for record in records
-    ]
+    return [to_response(record) for record in records]

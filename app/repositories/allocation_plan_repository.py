@@ -2,6 +2,7 @@
 
 from typing import Any
 from pymongo.errors import DuplicateKeyError
+from app.repositories.sample_filter import with_sample_filter
 from app.models.allocation_plan import AllocationPlanRecord
 
 
@@ -20,6 +21,15 @@ class AllocationPlanRepository:
             raise ValueError("Allocation plan ID already exists.") from exc
         return record
 
+    async def latest_version(self, event_id: str) -> int:
+        """Highest plan version for the event; records without a version count as 1."""
+        document = await self.collection.find_one(
+            {"event_id": event_id}, {"version": 1}, sort=[("version", -1)]
+        )
+        if document is None:
+            return 0
+        return int(document.get("version") or 1)
+
     async def get_by_id(self, plan_id: str) -> AllocationPlanRecord | None:
         document = await self.collection.find_one({"_id": plan_id})
         if document is None:
@@ -28,7 +38,7 @@ class AllocationPlanRepository:
         return AllocationPlanRecord.model_validate(document)
 
     async def list_by_event(
-        self, event_id: str, *, limit: int = 20, skip: int = 0
+        self, event_id: str, *, limit: int = 20, skip: int = 0, include_sample: bool = True
     ) -> list[AllocationPlanRecord]:
         if not event_id or not event_id.strip():
             raise ValueError("Event ID cannot be empty.")
@@ -38,7 +48,7 @@ class AllocationPlanRepository:
             raise ValueError("skip cannot be negative.")
 
         cursor = (
-            self.collection.find({"event_id": event_id})
+            self.collection.find(with_sample_filter({"event_id": event_id}, include_sample))
             .sort("created_at", -1)
             .skip(skip)
             .limit(limit)

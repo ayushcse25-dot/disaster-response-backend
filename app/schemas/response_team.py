@@ -6,6 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.models.flood_event import GeoLocation
 from app.models.response_team import TeamCapability, TeamStatus
+from app.services.resource_freshness import ResourceFreshness
 
 
 class ResponseTeamCreate(BaseModel):
@@ -80,3 +81,12 @@ class ResponseTeamResponse(BaseModel):
     availability_confirmed: bool
     created_at: datetime
     updated_at: datetime
+    is_sample: bool
+
+    # Derived server-side; see app/services/resource_freshness.py.
+    check_in_due_at: datetime | None
+    check_in_interval_hours: float
+    freshness: ResourceFreshness
+    freshness_rule: str
+    eligible_for_allocation: bool
+    status_reason: str | None

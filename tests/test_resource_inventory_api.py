@@ -1,4 +1,4 @@
-﻿"""API tests for resource inventory."""
+"""API tests for resource inventory."""
 
 from unittest.mock import AsyncMock
 
@@ -128,7 +128,7 @@ def test_list_inventory(client, mock_inventory_service, sample_inventory):
     mock_inventory_service.list_inventory.assert_awaited_once_with(
         sample_inventory.organisation_id,
         limit=10,
-        skip=0,
+        skip=0, include_sample=True,
     )
 
 
