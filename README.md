@@ -62,8 +62,10 @@ The test suite sets a dummy `MONGODB_URI` itself and never connects to a real cl
 python -m scripts.seed_sample --confirm
 ```
 
-Writes 3 flood events, 5 affected locations, 5 observations and 3 sources into the database
-named by `MONGODB_DB_NAME`. Every sample record has an ID starting with `sample-`,
+Writes 3 flood events, 5 affected locations, 5 observations, 3 sources, 4 inventory records and
+3 response teams (organisation `sample-org-001`), 5 resource needs and 2 allocation plans into
+the database named by `MONGODB_DB_NAME`. The plans are produced by the real allocation engine
+from the sample records (`sample-plan-001` READY, `sample-plan-002` BLOCKED). Every sample record has an ID starting with `sample-`,
 `is_sample: true`, and the text `SAMPLE DATA — NOT LIVE FLOOD INFORMATION`.
 
 - Refuses to run without `--confirm`.
@@ -112,6 +114,24 @@ There is no authentication yet.
 (`app/services/event_severity.py`): the highest severity among the event's affected locations
 (CRITICAL > HIGH > MODERATE > LOW), ignoring UNKNOWN locations; UNKNOWN when no location has
 a known severity. Clients should display it, not recompute it.
+
+### Resource freshness and eligibility
+
+Inventory and response-team responses include fields derived on the server
+(`app/services/resource_freshness.py`):
+
+- `check_in_due_at` = last check-in + `check_in_interval_hours` (inventory: `last_verified_at`
+  + 24 h; teams: `last_status_update` + 2 h — the limits the allocation engine applies).
+- `freshness`: FRESH before the final 25% of the interval, DUE in the final 25%, STALE at or
+  after `check_in_due_at`, UNVERIFIED if there is no check-in or it is in the future.
+  `freshness_rule` states this in every response.
+- `eligible_for_allocation` and `status_reason`: the same checks the allocation engine uses
+  (status, confirmation, age, remaining stock / personnel / existing assignment).
+
+### Allocation plan approval
+
+Approving or rejecting a plan uses a MongoDB transaction, which needs a replica set (Atlas is
+one). A standalone local `mongod` returns 503 and writes nothing.
 
 ### Observations
 
