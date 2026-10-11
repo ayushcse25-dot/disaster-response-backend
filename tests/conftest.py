@@ -1,8 +1,13 @@
+import os
+
 import pytest
 from fastapi.testclient import TestClient
 
 from app.core.config import get_settings
 from app.main import app
+
+# Tests never talk to a real cluster: a dummy URI satisfies Settings and overrides any .env value.
+os.environ["MONGODB_URI"] = "mongodb://127.0.0.1:1/?serverSelectionTimeoutMS=100"
 
 
 class FakeDatabase:
