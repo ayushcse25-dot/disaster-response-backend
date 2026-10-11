@@ -1,6 +1,7 @@
 import os
 
 import pytest
+import pytest_asyncio
 from fastapi.testclient import TestClient
 
 from app.core.config import get_settings
@@ -38,3 +39,44 @@ def _reset_state():
 def client() -> TestClient:
     # Not used as a context manager, so the lifespan (and MongoDB) is not started.
     return TestClient(app)
+
+
+# Integration tests use a throwaway database on a local replica set and are
+# skipped when none is reachable (override with TEST_MONGODB_URI).
+TEST_MONGODB_URI = os.environ.get(
+    "TEST_MONGODB_URI",
+    "mongodb://localhost:27017/?replicaSet=rs0&serverSelectionTimeoutMS=500",
+)
+
+
+@pytest_asyncio.fixture
+async def live_db():
+    from uuid import uuid4
+
+    from pymongo import AsyncMongoClient
+
+    from app.db.indexes import ensure_indexes
+
+    client = AsyncMongoClient(TEST_MONGODB_URI)
+    try:
+        await client.admin.command("ping")
+    except Exception:
+        await client.close()
+        pytest.skip("No local MongoDB replica set for integration tests.")
+    name = f"drp_test_{uuid4().hex[:10]}"
+    database = client[name]
+    await ensure_indexes(database)
+    try:
+        yield database
+    finally:
+        await client.drop_database(name)
+        await client.close()
+
+
+@pytest_asyncio.fixture
+async def seeded_db(live_db):
+    """live_db with the sample seed loaded (timestamps relative to now)."""
+    from scripts.seed_sample import seed
+
+    await seed(live_db)
+    return live_db

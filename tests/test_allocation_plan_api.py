@@ -7,16 +7,19 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from app.api.allocation_plans import get_allocation_plan_service
+from app.api.allocation_plans import get_allocation_plan_service, get_plan_lifecycle_service
 from app.main import app
-from app.models.allocation_plan import AllocationPlanRecord
+from app.models.allocation_plan import AllocationPlanRecord, AllocationPlanView
 from app.services.allocation_engine import AllocationPlan
 
 
 @pytest.fixture
 def allocation_plan_service_for_api_tests(client):
     service = AsyncMock()
+    lifecycle = AsyncMock()
+    lifecycle.view.side_effect = lambda record: AllocationPlanView(**record.model_dump())
     app.dependency_overrides[get_allocation_plan_service] = lambda: service
+    app.dependency_overrides[get_plan_lifecycle_service] = lambda: lifecycle
     yield service
     app.dependency_overrides.pop(get_allocation_plan_service, None)
 

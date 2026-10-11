@@ -1,5 +1,6 @@
 """Application entry point. Run with: uvicorn app.main:app --reload"""
 
+import asyncio
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -20,6 +21,7 @@ from app.api import (
 from app.core.config import get_settings
 from app.core.errors import register_exception_handlers
 from app.core.logging import configure_logging
+from app.db.indexes import ensure_indexes
 from app.db.mongo import create_mongo_client
 
 logger = logging.getLogger(__name__)
@@ -33,10 +35,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     configure_logging(settings.log_level)
     client = create_mongo_client(settings)
     app.state.mongo_db = client[settings.mongodb_db_name]
+    # In the background so an unreachable database never delays startup.
+    index_task = asyncio.create_task(ensure_indexes(app.state.mongo_db))
     logger.info("Application started (environment=%s)", settings.environment)
     try:
         yield
     finally:
+        index_task.cancel()
         await client.close()
         logger.info("MongoDB client closed")
 

@@ -74,7 +74,18 @@ class AllocationPlanService:
         self.inventory_repository = inventory_repository
         self.team_repository = team_repository
 
-    async def generate_for_event(self, event_id: str) -> AllocationPlanRecord:
+    async def build_for_event(
+        self,
+        event_id: str,
+        *,
+        organisation_id: str | None = None,
+        version: int = 1,
+    ) -> tuple[AllocationPlanRecord, str]:
+        """Run the engine on the current snapshot without persisting anything.
+
+        With organisation_id, only that organisation's inventory and teams are
+        considered. Returns the unsaved record and the snapshot digest.
+        """
         if not event_id or not event_id.strip():
             raise ValueError("Event ID cannot be empty.")
 
@@ -87,6 +98,9 @@ class AllocationPlanService:
         needs = await self.need_repository.list_for_planning()
         inventory = await self.inventory_repository.list_for_planning()
         teams = await self.team_repository.list_for_planning()
+        if organisation_id is not None:
+            inventory = [i for i in inventory if i.organisation_id == organisation_id]
+            teams = [t for t in teams if t.organisation_id == organisation_id]
 
         # The legacy field name is retained for API compatibility, but the
         # digest covers every input that can influence this planning result.
@@ -113,7 +127,15 @@ class AllocationPlanService:
             event_id=event.event_id,
             plan=result,
             created_at=generated_at,
+            version=version,
+            ngo_id=organisation_id,
         )
+        return record, inventory_version
+
+    async def generate_for_event(self, event_id: str) -> AllocationPlanRecord:
+        record, _ = await self.build_for_event(event_id)
+        latest = await self.plan_repository.latest_version(record.event_id)
+        record.version = latest + 1
         return await self.plan_repository.create(record)
 
     async def get_plan(self, plan_id: str) -> AllocationPlanRecord | None:

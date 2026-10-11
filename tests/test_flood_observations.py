@@ -122,7 +122,7 @@ def test_api_returns_404_for_missing_event(client):
     response = client.get("/api/v1/flood-events/nope/observations")
 
     assert response.status_code == 404
-    assert response.json() == {"detail": "Flood event not found."}
+    assert response.json() == {"detail": "Flood event not found.", "code": "NOT_FOUND"}
 
 
 @pytest.mark.parametrize("query", ["limit=0", "limit=101", "skip=-1"])

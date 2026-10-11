@@ -20,6 +20,15 @@ class AllocationPlanRepository:
             raise ValueError("Allocation plan ID already exists.") from exc
         return record
 
+    async def latest_version(self, event_id: str) -> int:
+        """Highest plan version for the event; records without a version count as 1."""
+        document = await self.collection.find_one(
+            {"event_id": event_id}, {"version": 1}, sort=[("version", -1)]
+        )
+        if document is None:
+            return 0
+        return int(document.get("version") or 1)
+
     async def get_by_id(self, plan_id: str) -> AllocationPlanRecord | None:
         document = await self.collection.find_one({"_id": plan_id})
         if document is None:
