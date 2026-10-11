@@ -5,10 +5,11 @@ import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 
 from app.api import (
     allocation_plans,
+    auth,
     affected_locations,
     flood_events,
     flood_observations,
@@ -19,7 +20,9 @@ from app.api import (
     response_teams,
     field_reports,
 )
+from app.api.auth_deps import STAFF, require_roles
 from app.core.config import get_settings
+from app.models.user import Role
 from app.core.errors import register_exception_handlers
 from app.core.logging import configure_logging
 from app.db.indexes import ensure_indexes
@@ -51,15 +54,18 @@ def create_app() -> FastAPI:
     app = FastAPI(title="Disaster Response Platform API", lifespan=lifespan)
     register_exception_handlers(app)
     app.include_router(health.router)
-    app.include_router(allocation_plans.router)
-    app.include_router(flood_events.router)
-    app.include_router(flood_observations.router)
-    app.include_router(resource_needs.router)
-    app.include_router(resource_inventory.router)
-    app.include_router(affected_locations.router)
-    app.include_router(response_teams.router)
-    app.include_router(field_reports.router)
-    app.include_router(orchestration.router)
+    app.include_router(auth.router)
+    # Every other router requires a signed-in staff account; individual routes
+    # add NGO scope checks. Workers only reach /me and their tasks.
+    staff = [Depends(require_roles(*STAFF))]
+    for module in (
+        allocation_plans, flood_events, flood_observations, resource_needs,
+        resource_inventory, affected_locations, response_teams, field_reports,
+    ):
+        app.include_router(module.router, dependencies=staff)
+    app.include_router(
+        orchestration.router, dependencies=[Depends(require_roles(Role.AUTHORITY))]
+    )
     return app
 
 

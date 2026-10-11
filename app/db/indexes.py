@@ -21,5 +21,13 @@ async def ensure_indexes(database) -> None:
         await database["ngo_assignments"].create_index(
             [("event_id", 1), ("input_digest", 1)], unique=True, name="event_digest_unique"
         )
+        await database["users"].create_index(
+            "email", unique=True, name="email_unique",
+            partialFilterExpression={"email": {"$type": "string"}},
+        )
+        await database["users"].create_index(
+            [("ngo_id", 1), ("worker_id", 1)], unique=True, name="ngo_worker_unique",
+            partialFilterExpression={"worker_id": {"$type": "string"}},
+        )
     except (PyMongoError, TypeError) as exc:
         logger.warning("Could not ensure indexes: %s", type(exc).__name__)

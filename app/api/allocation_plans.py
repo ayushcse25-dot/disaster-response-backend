@@ -1,13 +1,15 @@
 """Endpoints for allocation proposals and human approval decisions."""
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, ConfigDict, Field
 from pymongo.asynchronous.database import AsyncDatabase
 
 from app.api.deps import get_database
 from app.exceptions import PlanningSnapshotError
+from app.api.auth_deps import CurrentUser, ensure_ngo_scope, require_roles
 from app.core.errors import ApiError
+from app.models.user import Role
 from app.models.allocation_plan import AllocationPlanRecord, AllocationPlanView
 from app.repositories.affected_location_repository import AffectedLocationRepository
 from app.repositories.allocation_plan_repository import AllocationPlanRepository
@@ -84,6 +86,24 @@ def _raise_lifecycle_error(exc: PlanLifecycleError) -> None:
     raise ApiError(422, exc.code, exc.detail) from exc
 
 
+async def _check_plan_scope(database: AsyncDatabase, user, plan_id: str) -> None:
+    if user.role == Role.AUTHORITY:
+        return
+    document = await database["allocation_plans"].find_one({"_id": plan_id}, {"ngo_id": 1})
+    if document is None:
+        raise ApiError(404, "PLAN_NOT_FOUND", "Allocation plan not found.")
+    ensure_ngo_scope(user, document.get("ngo_id"))
+
+
+async def plan_scope(plan_id: str, user: CurrentUser, request: Request) -> None:
+    """NGO staff may act only on plans that use their organisation's resources."""
+    if user.role != Role.AUTHORITY:
+        await _check_plan_scope(get_database(request), user, plan_id)
+
+
+PlanScope = Depends(plan_scope)
+
+
 def get_allocation_approval_service(
     database: Annotated[AsyncDatabase, Depends(get_database)],
 ) -> AllocationApprovalService:
@@ -110,6 +130,7 @@ def _raise_approval_http_error(exc: Exception) -> None:
     "/flood-events/{event_id}/allocation-plans",
     response_model=AllocationPlanRecord,
     status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_roles(Role.AUTHORITY))],
 )
 async def generate_allocation_plan(
     event_id: str,
@@ -137,11 +158,14 @@ async def list_allocation_plans(
     event_id: str,
     service: Annotated[AllocationPlanService, Depends(get_allocation_plan_service)],
     lifecycle: Annotated[PlanLifecycleService, Depends(get_plan_lifecycle_service)],
+    user: CurrentUser,
     limit: Annotated[int, Query(ge=1, le=100)] = 20,
     skip: Annotated[int, Query(ge=0)] = 0,
 ) -> list[AllocationPlanView]:
     try:
         records = await service.list_plans(event_id, limit=limit, skip=skip)
+        if user.role != Role.AUTHORITY:
+            records = [r for r in records if r.ngo_id and r.ngo_id == user.ngo_id]
         return [await lifecycle.view(record) for record in records]
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
@@ -154,6 +178,7 @@ async def get_allocation_plan(
     plan_id: str,
     service: Annotated[AllocationPlanService, Depends(get_allocation_plan_service)],
     lifecycle: Annotated[PlanLifecycleService, Depends(get_plan_lifecycle_service)],
+    user: CurrentUser,
 ) -> AllocationPlanView:
     try:
         record = await service.get_plan(plan_id)
@@ -161,12 +186,14 @@ async def get_allocation_plan(
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     if record is None:
         raise ApiError(404, "PLAN_NOT_FOUND", "Allocation plan not found.")
+    ensure_ngo_scope(user, record.ngo_id)
     return await lifecycle.view(record)
 
 
 @router.post(
     "/allocation-plans/{plan_id}/replan",
     response_model=AllocationPlanRecord,
+    dependencies=[PlanScope],
     status_code=status.HTTP_201_CREATED,
 )
 async def replan_allocation_plan(
@@ -188,6 +215,7 @@ async def replan_allocation_plan(
 @router.post(
     "/allocation-plans/{plan_id}/manual-allocation",
     response_model=AllocationPlanRecord,
+    dependencies=[PlanScope],
     status_code=status.HTTP_201_CREATED,
 )
 async def manual_allocation(
@@ -208,7 +236,7 @@ async def manual_allocation(
         _raise_lifecycle_error(exc)
 
 
-@router.post("/allocation-plans/{plan_id}/approve", response_model=AllocationPlanRecord)
+@router.post("/allocation-plans/{plan_id}/approve", response_model=AllocationPlanRecord, dependencies=[PlanScope])
 async def approve_allocation_plan(
     plan_id: str,
     request: DecisionRequest,
@@ -229,7 +257,7 @@ async def approve_allocation_plan(
         _raise_approval_http_error(exc)
 
 
-@router.post("/allocation-plans/{plan_id}/reject", response_model=AllocationPlanRecord)
+@router.post("/allocation-plans/{plan_id}/reject", response_model=AllocationPlanRecord, dependencies=[PlanScope])
 async def reject_allocation_plan(
     plan_id: str,
     request: DecisionRequest,

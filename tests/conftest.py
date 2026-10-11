@@ -4,7 +4,9 @@ import pytest
 import pytest_asyncio
 from fastapi.testclient import TestClient
 
+from app.api.auth_deps import get_current_user
 from app.core.config import get_settings
+from app.models.user import Principal, Role
 from app.main import app
 
 # Tests never talk to a real cluster: a dummy URI satisfies Settings and overrides any .env value.
@@ -26,10 +28,15 @@ class FakeDatabase:
         return {"ok": 1.0}
 
 
+TEST_AUTHORITY = Principal(user_id="test-authority", role=Role.AUTHORITY, display_name="Test authority")
+
+
 @pytest.fixture(autouse=True)
 def _reset_state():
     get_settings.cache_clear()
     app.dependency_overrides.clear()
+    # API tests act as an authority unless they replace or remove this override.
+    app.dependency_overrides[get_current_user] = lambda: TEST_AUTHORITY
     yield
     app.dependency_overrides.clear()
     get_settings.cache_clear()

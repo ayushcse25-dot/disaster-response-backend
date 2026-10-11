@@ -397,6 +397,47 @@ async def seed(database: Any, now: datetime | None = None) -> dict[str, int]:
     return counts
 
 
+SAMPLE_ACCOUNTS = [
+    # (user_id, role, display name, email, ngo_id, worker_id)
+    ("sample-user-authority", "AUTHORITY", "SAMPLE District authority",
+     "authority@sample.local", None, None),
+    ("sample-user-ngo1", "NGO_ADMIN", "SAMPLE River Aid admin",
+     "ngo1@sample.local", SAMPLE_ORGANISATION_ID, None),
+    ("sample-user-ngo2", "NGO_ADMIN", "SAMPLE Ganga Seva admin",
+     "ngo2@sample.local", "sample-org-002", None),
+    ("sample-user-worker1", "WORKER", "SAMPLE field worker",
+     None, SAMPLE_ORGANISATION_ID, "W-001"),
+]
+
+
+async def seed_accounts(database: Any) -> list[tuple[str, str, str]]:
+    """(Re)create the sample accounts with fresh random passwords.
+
+    Returns (role, login, password) for printing; passwords are stored only as hashes.
+    """
+    import secrets
+
+    from app.core.security import hash_password
+    from app.models.user import UserAccount
+
+    credentials = []
+    for user_id, role, name, email, ngo_id, worker_id in SAMPLE_ACCOUNTS:
+        clash = await database["users"].find_one({"_id": user_id, "is_sample": {"$ne": True}})
+        if clash is not None:
+            raise SeedConflictError(f"users/{user_id} exists and is not sample data.")
+        password = secrets.token_urlsafe(9)
+        account = UserAccount(
+            user_id=user_id, role=role, display_name=name, email=email, ngo_id=ngo_id,
+            worker_id=worker_id, password_hash=hash_password(password), is_sample=True,
+        )
+        await database["users"].replace_one(
+            {"_id": user_id, "is_sample": True}, _doc(account, "user_id"), upsert=True
+        )
+        login = email or f"ngo_code=RIVERAID worker_id={worker_id}"
+        credentials.append((role, login, password))
+    return credentials
+
+
 async def _run() -> int:
     from app.core.config import get_settings
     from app.db.mongo import create_mongo_client
@@ -406,6 +447,7 @@ async def _run() -> int:
 
     try:
         counts = await seed(client[settings.mongodb_db_name])
+        credentials = await seed_accounts(client[settings.mongodb_db_name])
     except SeedConflictError as exc:
         print(f"Aborted: {exc}", file=sys.stderr)
         return 1
@@ -414,6 +456,10 @@ async def _run() -> int:
 
     for collection_name, count in counts.items():
         print(f"{collection_name}: {count} sample records upserted")
+
+    print("\nSample accounts (passwords regenerated on every seed; not stored anywhere else):")
+    for role, login, password in credentials:
+        print(f"  {role:<10} {login:<40} password: {password}")
 
     return 0
 
