@@ -20,3 +20,6 @@ class AllocationPlanRecord(BaseModel):
     rejected_by: str | None = None
     rejected_at: datetime | None = None
     rejection_reason: str | None = None
+
+    # True only for records written by scripts/seed_sample.py; the API never sets it.
+    is_sample: bool = False

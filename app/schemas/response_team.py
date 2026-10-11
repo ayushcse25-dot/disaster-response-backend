@@ -80,3 +80,4 @@ class ResponseTeamResponse(BaseModel):
     availability_confirmed: bool
     created_at: datetime
     updated_at: datetime
+    is_sample: bool

@@ -55,3 +55,4 @@ class ResourceNeedResponse(BaseModel):
     updated_at: datetime
 
     reassessment_required: bool
+    is_sample: bool
