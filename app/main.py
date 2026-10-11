@@ -13,6 +13,7 @@ from app.api import (
     flood_events,
     flood_observations,
     health,
+    orchestration,
     resource_inventory,
     resource_needs,
     response_teams,
@@ -58,6 +59,7 @@ def create_app() -> FastAPI:
     app.include_router(affected_locations.router)
     app.include_router(response_teams.router)
     app.include_router(field_reports.router)
+    app.include_router(orchestration.router)
     return app
 
 

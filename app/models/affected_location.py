@@ -29,6 +29,8 @@ class AffectedLocation(BaseModel):
     district: str | None = Field(default=None, max_length=100)
 
     coordinates: GeoLocation | None = None
+    # People affected at this location; None when not yet assessed.
+    population_affected: int | None = Field(default=None, ge=0)
 
     # UNKNOWN is used when the available evidence is insufficient.
     severity: SeverityLevel = SeverityLevel.UNKNOWN

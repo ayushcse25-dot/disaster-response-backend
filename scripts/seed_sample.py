@@ -31,6 +31,7 @@ from app.models.enums import (
 )
 from app.models.flood_event import FloodEvent, GeoLocation
 from app.models.flood_observation import FloodObservation
+from app.models.organisation import Organisation, OrganisationStatus
 from app.models.resource_inventory import (
     InventoryStatus,
     ResourceInventory,
@@ -143,6 +144,36 @@ def build_sample_documents(now: datetime) -> dict[str, list[dict[str, Any]]]:
         ),
     ]
 
+    organisations = [
+        Organisation(
+            organisation_id=SAMPLE_ORGANISATION_ID, name="SAMPLE River Aid Patna",
+            ngo_code="RIVERAID", base_location=GeoLocation(latitude=25.61, longitude=85.10),
+            service_radius_km=60, status=OrganisationStatus.APPROVED,
+            capabilities=[TeamCapability.WATER_RESCUE, TeamCapability.BOAT_OPERATIONS,
+                          TeamCapability.WATER_DISTRIBUTION, TeamCapability.FOOD_DISTRIBUTION,
+                          TeamCapability.MEDICAL_AID],
+            created_at=ago(days=60), updated_at=ago(days=60), is_sample=True,
+        ),
+        Organisation(
+            organisation_id="sample-org-002", name="SAMPLE Ganga Seva Hajipur",
+            ngo_code="GANGASEVA", base_location=GeoLocation(latitude=25.69, longitude=85.21),
+            service_radius_km=40, status=OrganisationStatus.APPROVED,
+            capabilities=[TeamCapability.FOOD_DISTRIBUTION, TeamCapability.SHELTER_SUPPORT],
+            created_at=ago(days=60), updated_at=ago(days=60), is_sample=True,
+        ),
+        # Out of range for the Patna event (about 650 km away).
+        Organisation(
+            organisation_id="sample-org-003", name="SAMPLE Brahmaputra Relief Guwahati",
+            ngo_code="BRAHMAHELP", base_location=GeoLocation(latitude=26.14, longitude=91.74),
+            service_radius_km=50, status=OrganisationStatus.APPROVED,
+            capabilities=[TeamCapability.WATER_RESCUE, TeamCapability.SHELTER_SUPPORT],
+            created_at=ago(days=60), updated_at=ago(days=60), is_sample=True,
+        ),
+    ]
+
+    population = {"sample-location-001": 1200, "sample-location-002": 800,
+                  "sample-location-004": 300}
+
     def location(location_id: str, event_id: str, name: str, state: str,
                  severity: SeverityLevel, observation_ids: list[str]) -> AffectedLocation:
         return AffectedLocation(
@@ -152,6 +183,7 @@ def build_sample_documents(now: datetime) -> dict[str, list[dict[str, Any]]]:
             state=state,
             severity=severity,
             supporting_observation_ids=observation_ids,
+            population_affected=population.get(location_id),
             assessed_at=ago(hours=1),
             last_changed_at=ago(hours=1),
             reassessment_required=severity == SeverityLevel.UNKNOWN,
@@ -310,7 +342,7 @@ def build_sample_documents(now: datetime) -> dict[str, list[dict[str, Any]]]:
         result.notes.append(LABEL)
         return AllocationPlanRecord(
             plan_id=plan_id, event_id=event.event_id, plan=result,
-            created_at=now, is_sample=True,
+            created_at=now, ngo_id=SAMPLE_ORGANISATION_ID, is_sample=True,
         )
 
     event_by_id = {event.event_id: event for event in events}
@@ -320,6 +352,7 @@ def build_sample_documents(now: datetime) -> dict[str, list[dict[str, Any]]]:
     ]
 
     return {
+        "organisations": [_doc(o, "organisation_id") for o in organisations],
         "sources": [_doc(s, "source_id") for s in sources],
         "flood_events": [_doc(e, "event_id") for e in events],
         "affected_locations": [_doc(loc, "location_id") for loc in locations],
