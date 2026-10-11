@@ -13,6 +13,7 @@ from app.models.flood_event import FloodEvent
 def flood_service_for_api_tests(client):
     """Override the flood event service with an isolated mock."""
     service = AsyncMock()
+    service.severity_for_events.return_value = {}
     app.dependency_overrides[get_flood_event_service] = lambda: service
     yield service
     app.dependency_overrides.pop(get_flood_event_service, None)

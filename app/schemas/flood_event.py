@@ -7,7 +7,9 @@ from app.models.enums import (
     EventVerificationStatus,
     HazardType,
 )
+from app.models.affected_location import SeverityLevel
 from app.models.flood_event import GeoLocation
+from app.services.event_severity import SeverityBasis
 
 
 class FloodEventCreate(BaseModel):
@@ -42,3 +44,7 @@ class FloodEventResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     is_sample: bool
+
+    # Derived server-side from affected locations; see app/services/event_severity.py.
+    severity: SeverityLevel
+    severity_basis: SeverityBasis
