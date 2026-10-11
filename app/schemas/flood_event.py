@@ -41,3 +41,4 @@ class FloodEventResponse(BaseModel):
     verification_status: EventVerificationStatus
     created_at: datetime
     updated_at: datetime
+    is_sample: bool

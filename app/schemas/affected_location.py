@@ -42,3 +42,4 @@ class AffectedLocationResponse(BaseModel):
     last_changed_at: datetime
     reassessment_required: bool
     reassessment_reason: str | None
+    is_sample: bool

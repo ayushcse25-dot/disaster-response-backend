@@ -47,6 +47,9 @@ class FloodObservation(BaseModel):
         max_length=500,
     )
 
+    # True only for records written by scripts/seed_sample.py; the API never sets it.
+    is_sample: bool = False
+
     @field_validator("observed_at", "received_at")
     @classmethod
     def validate_timezone_aware_timestamp(cls, value: datetime) -> datetime:

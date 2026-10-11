@@ -46,3 +46,6 @@ class AffectedLocation(BaseModel):
         default=None,
         max_length=1000,
     )
+
+    # True only for records written by scripts/seed_sample.py; the API never sets it.
+    is_sample: bool = False
