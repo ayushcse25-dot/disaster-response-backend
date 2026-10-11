@@ -13,10 +13,19 @@ from app.schemas.response_team import (
     ResponseTeamStatusUpdate,
     ResponseTeamResponse,
 )
+from app.services.resource_freshness import team_status_fields
 from app.services.response_team_service import ResponseTeamService
 
 
 router = APIRouter(tags=["Response Teams"])
+
+
+def to_response(team: ResponseTeam) -> ResponseTeamResponse:
+    """Combine a stored team with its derived freshness and eligibility."""
+
+    return ResponseTeamResponse.model_validate(
+        {**team.model_dump(), **team_status_fields(team).model_dump()}
+    )
 
 
 def get_response_team_service(
@@ -57,7 +66,7 @@ async def create_response_team(
             detail=str(exc),
         ) from exc
 
-    return ResponseTeamResponse.model_validate(created_team.model_dump())
+    return to_response(created_team)
 
 
 @router.get(
@@ -84,7 +93,7 @@ async def get_response_team(
             detail=f"Response team '{team_id}' does not exist.",
         )
 
-    return ResponseTeamResponse.model_validate(team.model_dump())
+    return to_response(team)
 
 
 @router.get(
@@ -111,10 +120,7 @@ async def list_response_teams(
             detail=str(exc),
         ) from exc
 
-    return [
-        ResponseTeamResponse.model_validate(team.model_dump())
-        for team in teams
-    ]
+    return [to_response(team) for team in teams]
 
 
 @router.patch(
@@ -146,7 +152,7 @@ async def update_response_team_status(
             detail=f"Response team '{team_id}' does not exist.",
         )
 
-    return ResponseTeamResponse.model_validate(team.model_dump())
+    return to_response(team)
 
 
 @router.patch(
@@ -177,4 +183,4 @@ async def update_response_team_location(
             detail=f"Response team '{team_id}' does not exist.",
         )
 
-    return ResponseTeamResponse.model_validate(team.model_dump())
+    return to_response(team)

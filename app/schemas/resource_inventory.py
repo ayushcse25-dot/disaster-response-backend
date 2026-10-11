@@ -10,6 +10,7 @@ from pydantic import (
     model_validator,
 )
 
+from app.services.resource_freshness import ResourceFreshness
 from app.models.resource_inventory import (
     InventoryStatus,
     ResourceType,
@@ -118,3 +119,11 @@ class ResourceInventoryResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     is_sample: bool
+
+    # Derived server-side; see app/services/resource_freshness.py.
+    check_in_due_at: datetime | None
+    check_in_interval_hours: float
+    freshness: ResourceFreshness
+    freshness_rule: str
+    eligible_for_allocation: bool
+    status_reason: str | None

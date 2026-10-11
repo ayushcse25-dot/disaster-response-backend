@@ -16,12 +16,21 @@ from app.schemas.resource_inventory import (
     ResourceInventoryCreate,
     ResourceInventoryResponse,
 )
+from app.services.resource_freshness import inventory_status_fields
 from app.services.resource_inventory_service import (
     ResourceInventoryService,
 )
 
 
 router = APIRouter(tags=["Resource Inventory"])
+
+
+def to_response(item: ResourceInventory) -> ResourceInventoryResponse:
+    """Combine a stored record with its derived freshness and eligibility."""
+
+    return ResourceInventoryResponse.model_validate(
+        {**item.model_dump(), **inventory_status_fields(item).model_dump()}
+    )
 
 
 def get_resource_inventory_service(
@@ -68,7 +77,7 @@ async def create_resource_inventory(
             detail=str(exc),
         ) from exc
 
-    return ResourceInventoryResponse.model_validate(created.model_dump())
+    return to_response(created)
 
 
 @router.get(
@@ -97,7 +106,7 @@ async def get_resource_inventory(
             detail="Inventory record not found.",
         )
 
-    return ResourceInventoryResponse.model_validate(inventory.model_dump())
+    return to_response(inventory)
 
 
 @router.get(
@@ -126,7 +135,4 @@ async def list_resource_inventory(
             detail=str(exc),
         ) from exc
 
-    return [
-        ResourceInventoryResponse.model_validate(record.model_dump())
-        for record in records
-    ]
+    return [to_response(record) for record in records]

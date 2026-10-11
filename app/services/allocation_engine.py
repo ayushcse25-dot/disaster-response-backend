@@ -151,6 +151,48 @@ def _normalise_unit(unit: str) -> str:
     return " ".join(unit.strip().casefold().split())
 
 
+def inventory_ineligibility_reasons(
+    item: ResourceInventory,
+    now: datetime,
+    maximum_age: timedelta = DEFAULT_INVENTORY_MAX_AGE,
+) -> list[str]:
+    """Why an inventory record cannot be proposed for any need right now."""
+    reasons: list[str] = []
+
+    if item.status != InventoryStatus.AVAILABLE:
+        reasons.append(f"Status is {item.status}, not AVAILABLE.")
+    if not item.availability_confirmed:
+        reasons.append("Availability has not been confirmed.")
+    if not _age_is_acceptable(item.last_verified_at, now, maximum_age):
+        reasons.append("Last verification is missing, in the future, or too old.")
+    if item.quantity_total - item.quantity_reserved - item.quantity_deployed <= 0:
+        reasons.append("No unreserved stock remains.")
+
+    return reasons
+
+
+def team_ineligibility_reasons(
+    team: ResponseTeam,
+    now: datetime,
+    maximum_age: timedelta = DEFAULT_TEAM_STATUS_MAX_AGE,
+) -> list[str]:
+    """Why a response team cannot be proposed for any need right now."""
+    reasons: list[str] = []
+
+    if team.status != TeamStatus.AVAILABLE:
+        reasons.append(f"Status is {team.status}, not AVAILABLE.")
+    if not team.availability_confirmed:
+        reasons.append("Availability has not been confirmed.")
+    if team.personnel_count <= 0:
+        reasons.append("No personnel recorded.")
+    if team.current_assignment_id is not None:
+        reasons.append("Already has an assignment.")
+    if not _age_is_acceptable(team.last_status_update, now, maximum_age):
+        reasons.append("Last status update is in the future or too old.")
+
+    return reasons
+
+
 def _decision_id(need_id: str, inventory_id: str, team_id: str) -> str:
     return f"proposal:{need_id}:{inventory_id}:{team_id}"
 
@@ -238,25 +280,14 @@ def generate_allocation_plan(
     eligible_inventory = [
         item
         for item in inventory
-        if item.status == InventoryStatus.AVAILABLE
-        and item.availability_confirmed
-        and _age_is_acceptable(
-            item.last_verified_at, now, inventory_max_age
-        )
-        and remaining_stock[item.inventory_id] > 0
+        if not inventory_ineligibility_reasons(item, now, inventory_max_age)
     ]
     eligible_inventory.sort(key=lambda item: item.inventory_id)
 
     eligible_teams = [
         team
         for team in teams
-        if team.status == TeamStatus.AVAILABLE
-        and team.availability_confirmed
-        and team.personnel_count > 0
-        and team.current_assignment_id is None
-        and _age_is_acceptable(
-            team.last_status_update, now, team_status_max_age
-        )
+        if not team_ineligibility_reasons(team, now, team_status_max_age)
     ]
     eligible_teams.sort(key=lambda team: team.team_id)
 
