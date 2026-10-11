@@ -15,6 +15,7 @@ from app.api import (
     flood_events,
     flood_observations,
     health,
+    ingestion,
     orchestration,
     resource_inventory,
     resource_needs,
@@ -28,6 +29,7 @@ from app.models.user import Role
 from app.core.errors import register_exception_handlers
 from app.core.logging import configure_logging
 from app.db.indexes import ensure_indexes
+from app.services.ingestion.runner import ingestion_loop
 from app.db.mongo import create_mongo_client
 
 logger = logging.getLogger(__name__)
@@ -43,11 +45,18 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.mongo_db = client[settings.mongodb_db_name]
     # In the background so an unreachable database never delays startup.
     index_task = asyncio.create_task(ensure_indexes(app.state.mongo_db))
+    ingestion_task = None
+    if settings.ingestion_enabled:
+        ingestion_task = asyncio.create_task(
+            ingestion_loop(app.state.mongo_db, settings.ingestion_interval_minutes * 60)
+        )
     logger.info("Application started (environment=%s)", settings.environment)
     try:
         yield
     finally:
         index_task.cancel()
+        if ingestion_task is not None:
+            ingestion_task.cancel()
         await client.close()
         logger.info("MongoDB client closed")
 
@@ -69,6 +78,7 @@ def create_app() -> FastAPI:
         app.include_router(module.router, dependencies=staff)
     authority = [Depends(require_roles(Role.AUTHORITY))]
     app.include_router(orchestration.router, dependencies=authority)
+    app.include_router(ingestion.router, dependencies=staff)
     app.include_router(demo.router, dependencies=authority)
     return app
 

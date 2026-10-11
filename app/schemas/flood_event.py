@@ -43,6 +43,7 @@ class FloodEventResponse(BaseModel):
     verification_status: EventVerificationStatus
     created_at: datetime
     updated_at: datetime
+    last_observed_at: datetime | None = None
     is_sample: bool
 
     # Derived server-side from affected locations; see app/services/event_severity.py.

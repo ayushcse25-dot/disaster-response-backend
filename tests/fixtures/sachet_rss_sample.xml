@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<?xml-stylesheet title="XSL_formatting" type="text/xsl" href="feed.xsl"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>All India: CAP Disaster Alert Feeds</title>
+    <description>CAP Integrated Alert System Warning Updates</description>
+    <language>en</language>
+    <link>https://sachet.ndma.gov.in/cap_public_website/rss/rss_india.xml</link>
+    <atom:link href="https://sachet.ndma.gov.in/cap_public_website/rss/rss_india.xml" rel="self" type="application/rss+xml"/>
+    <copyright>public domain</copyright>
+    <pubDate>Tue, 15 Sep 2026 09:02:00 GMT</pubDate>
+    <item>
+      <title>మీ ప్రాంతంలో పిడుగులు పడే అవకాశం ఉంది.ఉరుములు మెరుపులతో కూడిన వర్షం పడేప్పుడు చెట్లు,టవర్స్,పోల్స్,పొలాలు,బహిరంగ ప్రదేశాల్లో ఉండరాదు.సురక్షితమైన భవనాల్లో ఆశ్రయం పొందండి-ఆంధ్రప్రదేశ్ ప్రభుత్వం.</title>
+      <description/>
+      <category>Met</category>
+      <link>https://sachet.ndma.gov.in/cap_public_website/FetchXMLFile?identifier=1791719183056008</link>
+      <author>controlroom@ndma.gov.in (Andhra Pradesh SDMA)</author>
+      <guid isPermaLink="false">1791719183056008</guid>
+      <pubDate>Sun, 11 Oct 2026 11:46:56 GMT</pubDate>
+    </item>
+    <item>
+      <title>River Kamla Balan at Jhanjarpur in Madhubani district of Bihar continues to flow in above normal flood situation at 4:00 pm today.</title>
+      <description/>
+      <category>Met</category>
+      <link>https://sachet.ndma.gov.in/cap_public_website/FetchXMLFile?identifier=1791716545393016</link>
+      <author>controlroom@ndma.gov.in (CWC)</author>
+      <guid isPermaLink="false">1791716545393016</guid>
+      <pubDate>Sun, 11 Oct 2026 11:02:26 GMT</pubDate>
+    </item>
+    <item>
+      <title>Thunderstorm with Lightning, Heavy Rain, Hailstorm, Very Strong Winds is likely to occur  at isolated places over Ambala, Kaithal, Karnal, Kurukshetra in next 24 hours.</title>
+      <description/>
+      <category>Met</category>
+      <link>https://sachet.ndma.gov.in/cap_public_website/FetchXMLFile?identifier=1791710646548024</link>
+      <author>controlroom@ndma.gov.in (IMD Chandigarh)</author>
+      <guid isPermaLink="false">1791710646548024</guid>
+      <pubDate>Sun, 11 Oct 2026 09:24:08 GMT</pubDate>
+    </item>
+    <item>
+      <title>उत्तर प्रदेश के बलिया ज़िले में तुर्तीपार के पास घाघरा नदी आज सुबह 8:00 बजे भी सामान्य से ऊपर बाढ़ की स्थिति में बह रही है।</title>
+      <description/>
+      <category>Met</category>
+      <link>https://sachet.ndma.gov.in/cap_public_website/FetchXMLFile?identifier=1791693599563013</link>
+      <author>controlroom@ndma.gov.in (CWC)</author>
+      <guid isPermaLink="false">1791693599563013</guid>
+      <pubDate>Sun, 11 Oct 2026 04:43:45 GMT</pubDate>
+    </item>
+  </channel>
+</rss>

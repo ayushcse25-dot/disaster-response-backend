@@ -29,5 +29,10 @@ async def ensure_indexes(database) -> None:
             [("ngo_id", 1), ("worker_id", 1)], unique=True, name="ngo_worker_unique",
             partialFilterExpression={"worker_id": {"$type": "string"}},
         )
+        # Ingested items: one observation per source item, so reruns never duplicate.
+        await database["flood_observations"].create_index(
+            "dedupe_key", unique=True, name="dedupe_key_unique",
+            partialFilterExpression={"dedupe_key": {"$type": "string"}},
+        )
     except (PyMongoError, TypeError) as exc:
         logger.warning("Could not ensure indexes: %s", type(exc).__name__)

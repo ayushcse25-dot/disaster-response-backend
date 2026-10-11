@@ -57,4 +57,8 @@ class FloodObservationResponse(BaseModel):
     verification_status: EventVerificationStatus
     freshness: Freshness
     freshness_rule: str
+    # Set for ingested items: fetch time, short summary, and the per-source dedupe key.
+    retrieved_at: datetime | None = None
+    summary: str | None = None
+    dedupe_key: str | None = None
     is_sample: bool

@@ -32,6 +32,10 @@ class Settings(BaseSettings):
     auth_secret: SecretStr = SecretStr("dev-only-insecure-auth-secret-change-me")
     token_ttl_minutes: int = Field(default=720, ge=1)
 
+    # Background ingestion loop (POST /api/v1/ingestion/run works regardless).
+    ingestion_enabled: bool = False
+    ingestion_interval_minutes: int = Field(default=30, ge=5)
+
     # Enables /api/v1/demo/*. Off unless explicitly set.
     demo_enabled: bool = False
 
