@@ -10,6 +10,7 @@ from app.api import (
     allocation_plans,
     affected_locations,
     flood_events,
+    flood_observations,
     health,
     resource_inventory,
     resource_needs,
@@ -46,6 +47,7 @@ def create_app() -> FastAPI:
     app.include_router(health.router)
     app.include_router(allocation_plans.router)
     app.include_router(flood_events.router)
+    app.include_router(flood_observations.router)
     app.include_router(resource_needs.router)
     app.include_router(resource_inventory.router)
     app.include_router(affected_locations.router)
