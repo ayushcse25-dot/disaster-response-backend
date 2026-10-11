@@ -18,6 +18,7 @@ class AffectedLocationCreate(BaseModel):
     state: str = Field(min_length=1, max_length=100)
     district: str | None = Field(default=None, max_length=100)
     coordinates: GeoLocation | None = None
+    population_affected: int | None = Field(default=None, ge=0)
 
     severity: SeverityLevel = SeverityLevel.UNKNOWN
     supporting_observation_ids: list[str] = Field(default_factory=list)
@@ -34,6 +35,7 @@ class AffectedLocationResponse(BaseModel):
     state: str
     district: str | None
     coordinates: GeoLocation | None
+    population_affected: int | None = None
 
     severity: SeverityLevel
     supporting_observation_ids: list[str]

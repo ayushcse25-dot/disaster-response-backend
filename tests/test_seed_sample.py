@@ -7,6 +7,7 @@ import pytest
 
 from app.models.affected_location import AffectedLocation
 from app.models.allocation_plan import AllocationPlanRecord
+from app.models.organisation import Organisation
 from app.models.flood_event import FloodEvent
 from app.models.flood_observation import FloodObservation
 from app.models.resource_inventory import ResourceInventory
@@ -57,6 +58,7 @@ class FakeDatabase(dict):
 def test_sample_documents_are_valid_labelled_and_prefixed():
     documents = build_sample_documents(NOW)
     models = {
+        "organisations": (Organisation, "organisation_id"),
         "sources": (SourceRegistryEntry, "source_id"),
         "flood_events": (FloodEvent, "event_id"),
         "affected_locations": (AffectedLocation, "location_id"),
