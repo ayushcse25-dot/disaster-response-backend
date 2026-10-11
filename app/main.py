@@ -18,6 +18,7 @@ from app.api import (
     resource_inventory,
     resource_needs,
     response_teams,
+    tasks,
     field_reports,
 )
 from app.api.auth_deps import STAFF, require_roles
@@ -55,6 +56,8 @@ def create_app() -> FastAPI:
     register_exception_handlers(app)
     app.include_router(health.router)
     app.include_router(auth.router)
+    # Tasks check role and ownership per action (workers included).
+    app.include_router(tasks.router)
     # Every other router requires a signed-in staff account; individual routes
     # add NGO scope checks. Workers only reach /me and their tasks.
     staff = [Depends(require_roles(*STAFF))]
